@@ -381,7 +381,7 @@ int main(int argc, char **argv)
 					// nothing else has to be done, could be a language patch, or a dev system, the user will know what they have done
 					if (hasTitleTmdMatchingLauncher)
 					{
-						FILE* launcherTmd = fopen(launcherTmdPath, "rb");
+						FILE* launcherTmd = fopen(launcherTmdPath, "r+b");
 						if(!launcherTmd)
 						{
 							messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
