@@ -348,7 +348,7 @@ int main(int argc, char **argv)
 					
 					{
 						char buffer[1024] = {0};
-						//write the first 512 bytes as 0, as that's the size of a tmd, but it can be whatever						
+						//write the first 520 bytes as 0, as that's the size of a tmd, but it can be whatever						
 						if (fwrite(buffer, sizeof(char), 520, targetTmd) != 520)
 						{
 							fclose(unlaunchInstaller);
