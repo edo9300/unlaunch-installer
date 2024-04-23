@@ -398,7 +398,7 @@ int main(int argc, char **argv)
 
 					//Mark the tmd as readonly
 					int fatAttributes = FAT_getAttr("nand:/title/00030017/484e4141/content/title.tmd");
-					if(!FAT_setAttr("nand:/title/00030017/484e4141/content/title.tmd", fatAttributes | ATTR_READONLY) != 0)
+					if(FAT_setAttr("nand:/title/00030017/484e4141/content/title.tmd", fatAttributes | ATTR_READONLY) != 0)
 					{
 						messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as read only\n");
 						remove("nand:/title/00030017/484e4141/content/title.tmd");
