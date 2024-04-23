@@ -176,6 +176,73 @@ bool safeCreateDir(const char* path)
 	return false;
 }
 
+bool toggleReadOnly(const char* path, bool readOnly)
+{
+	int fatAttributes = FAT_getAttr(path);
+	if (readOnly)
+		fatAttributes |= ATTR_READONLY;
+	else
+		fatAttributes &= ~ATTR_READONLY;
+	return FAT_setAttr(path, fatAttributes) == 0;
+}
+
+bool patchMainTmd(const char* path)
+{
+	FILE* launcherTmd = fopen(path, "r+b");
+	if(!launcherTmd)
+	{
+		messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
+		return false;
+	}
+	// Patches the title.tmd's title id from HNXX to GNXX
+	fseek(launcherTmd, 0x190, SEEK_SET);
+	char c;
+	fread(&c, 1, 1, launcherTmd);
+	//if byte is not already set, it's clean
+	if(c == 0x48)
+	{
+		fseek(launcherTmd, -1, SEEK_CUR);
+		c = 0x47;
+		fwrite(&c, 1, 1, launcherTmd);
+	}
+	else if(c != 0x47)
+	{
+		messageBox("\x1B[31mError:\x1B[33m Default launcher's title.tmd was tamprered with, aborting\n");
+		fclose(launcherTmd);
+		return false;
+	}
+	fclose(launcherTmd);
+	return true;
+}
+
+bool restoreMainTmd(const char* path)
+{
+	FILE* launcherTmd = fopen(path, "r+b");
+	if(!launcherTmd)
+	{
+		messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
+		return false;
+	}
+	// Set back the title.tmd's title id from GNXX to HNXX
+	fseek(launcherTmd, 0x190, SEEK_SET);
+	char c;
+	fread(&c, 1, 1, launcherTmd);
+	//if byte is not what we expect, the install method was different
+	if(c == 0x47)
+	{
+		fseek(launcherTmd, -1, SEEK_CUR);
+		c = 0x48;
+		fwrite(&c, 1, 1, launcherTmd);
+	}
+	else if(c != 0x47)
+	{
+		messageBox("\x1B[31mError:\x1B[33m Unlaunch was installed with a different method\aborting\n");
+		fclose(launcherTmd);
+		return false;
+	}
+	fclose(launcherTmd);
+	return true;
+}
 int main(int argc, char **argv)
 {
 	srand(time(0));
@@ -284,32 +351,12 @@ int main(int argc, char **argv)
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL:
 				if(hasTitleTmdMatchingLauncher && nandio_unlock_writing())
 				{
-					FILE* launcherTmd = fopen(launcherTmdPath, "r+b");
-					if(!launcherTmd)
+					if (!toggleReadOnly(launcherTmdPath, false) || !restoreMainTmd(launcherTmdPath))
 					{
-						messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
+						messageBox("\x1B[31mError:\x1B[33m Uninstall failed\n");
 						nandio_lock_writing();
 						break;
 					}
-					// Set back the title.tmd's title id from GNXX to HNXX
-					fseek(launcherTmd, 0x190, SEEK_SET);
-					char c;
-					fread(&c, 1, 1, launcherTmd);
-					//if byte is not what we expect, the install method was different
-					if(c == 0x47)
-					{
-						fseek(launcherTmd, -1, SEEK_CUR);
-						c = 0x48;
-						fwrite(&c, 1, 1, launcherTmd);
-					}
-					else if(c != 0x47)
-					{
-						messageBox("\x1B[31mError:\x1B[33m Unlaunch was installed with a different method\aborting\n");
-						fclose(launcherTmd);
-						nandio_lock_writing();
-						break;
-					}
-					fclose(launcherTmd);
 					nandio_lock_writing();
 				}
 				break;
@@ -397,8 +444,7 @@ int main(int argc, char **argv)
 					fclose(targetTmd);
 
 					//Mark the tmd as readonly
-					int fatAttributes = FAT_getAttr("nand:/title/00030017/484e4141/content/title.tmd");
-					if(FAT_setAttr("nand:/title/00030017/484e4141/content/title.tmd", fatAttributes | ATTR_READONLY) != 0)
+					if(toggleReadOnly("nand:/title/00030017/484e4141/content/title.tmd", true))
 					{
 						messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as read only\n");
 						remove("nand:/title/00030017/484e4141/content/title.tmd");
@@ -409,43 +455,33 @@ int main(int argc, char **argv)
 					}
 
 					//Finally patch the default launcher tmd to be invalid
-
 					//If there isn't a title.tmd matching the language region in the hwinfo
 					// nothing else has to be done, could be a language patch, or a dev system, the user will know what they have done
 					if (hasTitleTmdMatchingLauncher)
 					{
-						FILE* launcherTmd = fopen(launcherTmdPath, "r+b");
-						if(!launcherTmd)
+						if(!patchMainTmd(launcherTmdPath))
 						{
-							messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
-							remove("nand:/title/00030017/484e4141/content/title.tmd");
-							rmdir("nand:/title/00030017/484e4141/content");
-							rmdir("nand:/title/00030017/484e4141");
+							if(!toggleReadOnly("nand:/title/00030017/484e4141/content/title.tmd", false))
+							{
+								messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n");
+							}
+							else
+							{
+								remove("nand:/title/00030017/484e4141/content/title.tmd");
+								rmdir("nand:/title/00030017/484e4141/content");
+								rmdir("nand:/title/00030017/484e4141");
+							}
 							nandio_lock_writing();
 							break;
 						}
-						// Patches the title.tmd's title id from HNXX to GNXX
-						fseek(launcherTmd, 0x190, SEEK_SET);
-						char c;
-						fread(&c, 1, 1, launcherTmd);
-						//if byte is not already set, it's clean
-						if(c == 0x48)
+						if (!toggleReadOnly(launcherTmdPath, true))
 						{
-							fseek(launcherTmd, -1, SEEK_CUR);
-							c = 0x47;
-							fwrite(&c, 1, 1, launcherTmd);
+#if 0
+							// TODO: Rollback or live with it?
+							messageBox("\x1B[31mError:\x1B[33m Failed to mark default launcher's title.tmd\nas read only, reverting the changes\n");
+							restoreMainTmd(launcherTmdPath)
+#endif
 						}
-						else if(c != 0x47)
-						{
-							messageBox("\x1B[31mError:\x1B[33m Default launcher's title.tmd was tamprered with, aborting\n");
-							remove("nand:/title/00030017/484e4141/content/title.tmd");
-							rmdir("nand:/title/00030017/484e4141/content");
-							rmdir("nand:/title/00030017/484e4141");
-							nandio_lock_writing();
-							fclose(launcherTmd);
-							break;
-						}
-						fclose(launcherTmd);
 					}
 					nandio_lock_writing();
 					unlaunchFound = true;
