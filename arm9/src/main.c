@@ -281,6 +281,39 @@ int main(int argc, char **argv)
 				installMenu();
 				break;
 
+			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL:
+				if(hasTitleTmdMatchingLauncher && nandio_unlock_writing())
+				{
+					FILE* launcherTmd = fopen(launcherTmdPath, "r+b");
+					if(!launcherTmd)
+					{
+						messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
+						nandio_lock_writing();
+						break;
+					}
+					// Set back the title.tmd's title id from GNXX to HNXX
+					fseek(launcherTmd, 0x190, SEEK_SET);
+					char c;
+					fread(&c, 1, 1, launcherTmd);
+					//if byte is not what we expect, the install method was different
+					if(c == 0x47)
+					{
+						fseek(launcherTmd, -1, SEEK_CUR);
+						c = 0x48;
+						fwrite(&c, 1, 1, launcherTmd);
+					}
+					else if(c != 0x47)
+					{
+						messageBox("\x1B[31mError:\x1B[33m Unlaunch was installed with a different method\aborting\n");
+						fclose(launcherTmd);
+						nandio_lock_writing();
+						break;
+					}
+					fclose(launcherTmd);
+					nandio_lock_writing();
+				}
+				break;
+
 			case MAIN_MENU_SAFE_UNLAUNCH_INSTALL:
 				if (unlaunchInstallerFound && (choiceBox("Install unlaunch?") == YES)
 					&& (hasTitleTmdMatchingLauncher || (choiceBox("There doesn't seem to be a launcher.tmd\nfile matcing the hwinfo file\nKeep installing?") == YES))
@@ -314,9 +347,9 @@ int main(int argc, char **argv)
 					}
 					
 					{
-						char buffer[512] = {0};
+						char buffer[1024] = {0};
 						//write the first 512 bytes as 0, as that's the size of a tmd, but it can be whatever						
-						if (fwrite(buffer, sizeof(char), 512, targetTmd) != 512)
+						if (fwrite(buffer, sizeof(char), 520, targetTmd) != 520)
 						{
 							fclose(unlaunchInstaller);
 							fclose(targetTmd);
@@ -364,7 +397,7 @@ int main(int argc, char **argv)
 					fclose(targetTmd);
 
 					//Mark the tmd as readonly
-					/*int fatAttributes = FAT_getAttr("nand:/title/00030017/484e4141/content/title.tmd");
+					int fatAttributes = FAT_getAttr("nand:/title/00030017/484e4141/content/title.tmd");
 					if(!FAT_setAttr("nand:/title/00030017/484e4141/content/title.tmd", fatAttributes | ATTR_READONLY) != 0)
 					{
 						messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as read only\n");
@@ -373,7 +406,7 @@ int main(int argc, char **argv)
 						rmdir("nand:/title/00030017/484e4141");
 						nandio_lock_writing();
 						break;
-					}*/
+					}
 
 					//Finally patch the default launcher tmd to be invalid
 
@@ -395,7 +428,7 @@ int main(int argc, char **argv)
 						fseek(launcherTmd, 0x190, SEEK_SET);
 						char c;
 						fread(&c, 1, 1, launcherTmd);
-						//if byte is not already 
+						//if byte is not already set, it's clean
 						if(c == 0x48)
 						{
 							fseek(launcherTmd, -1, SEEK_CUR);
