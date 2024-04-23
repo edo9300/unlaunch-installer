@@ -223,14 +223,14 @@ int main(int argc, char **argv)
 
 			sprintf(launcherTmdPath, "nand:/title/00030017/%08lx/content/title.tmd", launcherTid);
 			unsigned long long tmdSize = getFileSizePath(launcherTmdPath);
-			if(tmdSize != 520)
-			{
-				hasTitleTmdMatchingLauncher = false;
-			}
-			else if (tmdSize > 520)
+			if (tmdSize > 520)
 			{
 				unlaunchFound = true;
 				unlaunchPatches = checkIfUnlaunchHasPatches(launcherTmdPath);
+			}
+			else if(tmdSize != 520)
+			{
+				hasTitleTmdMatchingLauncher = false;
 			}
 		}
 		
@@ -364,7 +364,7 @@ int main(int argc, char **argv)
 					fclose(targetTmd);
 
 					//Mark the tmd as readonly
-					int fatAttributes = FAT_getAttr("nand:/title/00030017/484e4141/content/title.tmd");
+					/*int fatAttributes = FAT_getAttr("nand:/title/00030017/484e4141/content/title.tmd");
 					if(!FAT_setAttr("nand:/title/00030017/484e4141/content/title.tmd", fatAttributes | ATTR_READONLY) != 0)
 					{
 						messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as read only\n");
@@ -373,7 +373,7 @@ int main(int argc, char **argv)
 						rmdir("nand:/title/00030017/484e4141");
 						nandio_lock_writing();
 						break;
-					}
+					}*/
 
 					//Finally patch the default launcher tmd to be invalid
 
@@ -391,7 +391,6 @@ int main(int argc, char **argv)
 							nandio_lock_writing();
 							break;
 						}
-						FILE * f = fopen("title.tmd", "r+b");
 						// Patches the title.tmd's title id from HNXX to GNXX
 						fseek(launcherTmd, 0x190, SEEK_SET);
 						char c;
@@ -401,7 +400,7 @@ int main(int argc, char **argv)
 						{
 							fseek(launcherTmd, -1, SEEK_CUR);
 							c = 0x47;
-							fwrite(&launcherTmd, 1, 1, f);
+							fwrite(&c, 1, 1, launcherTmd);
 						}
 						else if(c != 0x47)
 						{
