@@ -237,7 +237,18 @@ bool restoreMainTmd(const char* path)
 	}
 	else if(c != 0x47)
 	{
-		messageBox("\x1B[31mError:\x1B[33m Unlaunch was installed with a different method\aborting\n");
+		if (unlaunchFound) {
+			// Trim the old unlaunch installed TMDs to 520b
+			messageBox(" Unlaunch was installed with the legacy method\nTrimming tmd\n");
+			if (ftruncate(fileno(launcherTmd), 520) != 0) {
+        		messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
+       			fclose(launcherTmd);
+       			return false;
+   			}
+   			fclose(launcherTmd);
+       		return true;
+		}
+		messageBox("\x1B[31mError:\x1B[33m Unlaunch was installed with an\nunknown method\naborting\n");
 		fclose(launcherTmd);
 		return false;
 	}
@@ -254,7 +265,9 @@ bool restoreProtoTmd(const char* path)
 		messageBox("\x1B[31mError:\x1B[33m No original tmd found!\nCan't uninstall unlaunch.\n");
 		return false;		
 	}
+	remove(path);
 	copyFile("nand:/title/00030017/484e4141/content/title.tmd.bak", path);
+	remove("nand:/title/00030017/484e4141/content/title.tmd.bak");
 	return true;
 }
 int main(int argc, char **argv)
@@ -303,13 +316,6 @@ int main(int argc, char **argv)
 			fclose(file);
 
 			region = launcherTid & 0xFF;
-			// I own and know of many people with retail and dev prototypes
-			// These can normally be identified by having the region set to ALL (41)
-			if (region == 0x41 || region == 0xFF)
-			{
-				notProto = false;
-				hasTitleTmdMatchingLauncher = true;
-			}
 
 			sprintf(launcherTmdPath, "nand:/title/00030017/%08lx/content/title.tmd", launcherTid);
 			unsigned long long tmdSize = getFileSizePath(launcherTmdPath);
@@ -321,6 +327,13 @@ int main(int argc, char **argv)
 			else if(tmdSize != 520)
 			{
 				hasTitleTmdMatchingLauncher = false;
+			}
+			// I own and know of many people with retail and dev prototypes
+			// These can normally be identified by having the region set to ALL (0x41)
+			if (region == 0x41 || region == 0xFF)
+			{
+				notProto = false;
+				hasTitleTmdMatchingLauncher = true;
 			}
 			// HWINFO_S may not always exist (PRE_IMPORT). Fill in defaults if that happens.
 		} else {
@@ -387,13 +400,16 @@ int main(int argc, char **argv)
 							break;
 						}
 					} else {
-						if (!toggleReadOnly(launcherTmdPath, false) || !restoreProtoTmd(launcherTmdPath)) {
+						if (!toggleReadOnly("nand:/title/00030017/484e4141/content/title.tmd", false) || !restoreProtoTmd("nand:/title/00030017/484e4141/content/title.tmd")) {
 							messageBox("\x1B[31mError:\x1B[33m Uninstall failed\n");
 							nandio_lock_writing();
 							break;
 						}
 					}
 					nandio_lock_writing();
+					messageBox("Uninstall successful!\n");
+				} else {
+					messageBox("\x1B[31mError:\x1B[33m Unlaunch is not installed\n");
 				}
 				break;
 
