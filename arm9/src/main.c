@@ -4,14 +4,15 @@
 #include "nand/nandio.h"
 #include "storage.h"
 #include "version.h"
+#include "unlaunch.h"
 #include <errno.h>
 #include <dirent.h>
 #include <time.h>
 
 bool programEnd = false;
 bool sdnandMode = true;
-bool hasTitleTmdMatchingLauncher = true;
-bool notProto = true;
+bool retailLauncherTmdPresentAndToBePatched = true;
+bool retailConsole = true;
 bool unlaunchInstallerFound = false;
 bool unlaunchFound = false;
 bool unlaunchPatches = false;
@@ -20,7 +21,7 @@ bool launcherDSiFound = false;
 bool arm7Exiting = false;
 bool charging = false;
 u8 batteryLevel = 0;
-u8 region = 0;
+u8 region = 0xFF;
 
 PrintConsole topScreen;
 PrintConsole bottomScreen;
@@ -165,128 +166,6 @@ bool checkIfUnlaunchHasPatches(const char* path)
 	return patched;
 }
 
-bool safeCreateDir(const char* path)
-{
-	if (((mkdir(path, 0777) == 0) || errno == EEXIST))
-		return true;
-	
-	char errorStr[512];
-	sprintf(errorStr, "\x1B[31mError:\x1B[33m Failed to create directory (%s)\n", path);
-	
-	messageBox(errorStr);
-	return false;
-}
-
-bool toggleReadOnly(const char* path, bool readOnly)
-{
-	int fatAttributes = FAT_getAttr(path);
-	if (readOnly)
-		fatAttributes |= ATTR_READONLY;
-	else
-		fatAttributes &= ~ATTR_READONLY;
-	return FAT_setAttr(path, fatAttributes) == 0;
-}
-
-bool patchMainTmd(const char* path)
-{
-	FILE* launcherTmd = fopen(path, "r+b");
-	if(!launcherTmd)
-	{
-		messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
-		return false;
-	}
-	// Patches the title.tmd's title id from HNXX to GNXX
-	fseek(launcherTmd, 0x190, SEEK_SET);
-	char c;
-	fread(&c, 1, 1, launcherTmd);
-	//if byte is not already set, it's clean
-	if(c == 0x48)
-	{
-		fseek(launcherTmd, -1, SEEK_CUR);
-		c = 0x47;
-		fwrite(&c, 1, 1, launcherTmd);
-	}
-	else if(c != 0x47)
-	{
-		messageBox("\x1B[31mError:\x1B[33m Default launcher's title.tmd was tamprered with, aborting\n");
-		fclose(launcherTmd);
-		return false;
-	}
-	if (unlaunchFound) {
-		// Remove unlaunch if it already exists on the main launcher tmd.
-		// If we don't do this and unlaunch is on the tmd, it will take over and prevent loading HNAA 
-		messageBox(" Unlaunch is already installed \nwith the legacy method\nTrying to remove...\n");
-		if (ftruncate(fileno(launcherTmd), 520) != 0) {
-			messageBox("\x1B[31mError:\x1B[33m Failed to remove old unlaunch\n");
-   			fclose(launcherTmd);
-   			return false;
-			}
-			fclose(launcherTmd);
-   		return true;
-	}
-	fclose(launcherTmd);
-	return true;
-}
-
-bool restoreMainTmd(const char* path)
-{
-	FILE* launcherTmd = fopen(path, "r+b");
-	if(!launcherTmd)
-	{
-		messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
-		return false;
-	}
-	// Set back the title.tmd's title id from GNXX to HNXX
-	fseek(launcherTmd, 0x190, SEEK_SET);
-	char c;
-	fread(&c, 1, 1, launcherTmd);
-	//if byte is not what we expect, the install method was different
-	if(c == 0x47)
-	{
-		fseek(launcherTmd, -1, SEEK_CUR);
-		c = 0x48;
-		fwrite(&c, 1, 1, launcherTmd);
-	}
-	else if(c != 0x47)
-	{
-		if (unlaunchFound) {
-			// Remove unlaunch if it already exists on the main launcher tmd.
-			// If we don't do this and unlaunch is on the tmd, it will take over and prevent loading HNAA 
-
-			// This is also a good idea to make sure the tmd is 520b. 
-			// You will have a much higher brick risk if something goes wrong with a tmd over 520b.
-			// See: http://docs.randommeaninglesscharacters.com/unlaunch.html
-			messageBox(" Unlaunch was installed with the legacy method\nTrimming tmd\n");
-			if (ftruncate(fileno(launcherTmd), 520) != 0) {
-				messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
-	   			fclose(launcherTmd);
-	   			return false;
-   			}
-   			fclose(launcherTmd);
-	   		return true;
-		}
-		messageBox("\x1B[31mError:\x1B[33m Unlaunch was installed with an\nunknown method\naborting\n");
-		fclose(launcherTmd);
-		return false;
-	}
-	fclose(launcherTmd);
-	return true;
-}
-
-bool restoreProtoTmd(const char* path)
-{
-	bool hnaaBackupExists = false;
-	hnaaBackupExists = (access("nand:/title/00030017/484e4141/content/title.tmd.bak", F_OK) == 0);
-	if (!hnaaBackupExists)
-	{
-		messageBox("\x1B[31mError:\x1B[33m No original tmd found!\nCan't uninstall unlaunch.\n");
-		return false;		
-	}
-	remove(path);
-	copyFile("nand:/title/00030017/484e4141/content/title.tmd.bak", path);
-	remove("nand:/title/00030017/484e4141/content/title.tmd.bak");
-	return true;
-}
 int main(int argc, char **argv)
 {
 	srand(time(0));
@@ -320,11 +199,10 @@ int main(int argc, char **argv)
 	unlaunchInstallerFound = (access("sd:/unlaunch.dsi", F_OK) == 0);
 
 	//check for unlaunch and region
-	char launcherTmdPath[64];
-	char hnaaTmdPath[64];
+	char retailLauncherTmdPath[64];
+	const char* hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd";
 	{
-		sprintf(hnaaTmdPath, "nand:/title/00030017/484e4141/content/title.tmd");
-		FILE *file = fopen("nand:/sys/HWINFO_S.dat", "rb");
+		FILE* file = fopen("nand:/sys/HWINFO_S.dat", "rb");
 		if (file)
 		{
 			fseek(file, 0xA0, SEEK_SET);
@@ -334,30 +212,24 @@ int main(int argc, char **argv)
 
 			region = launcherTid & 0xFF;
 
-			sprintf(launcherTmdPath, "nand:/title/00030017/%08lx/content/title.tmd", launcherTid);
-			unsigned long long tmdSize = getFileSizePath(launcherTmdPath);
+			sprintf(retailLauncherTmdPath, "nand:/title/00030017/%08lx/content/title.tmd", launcherTid);
+			unsigned long long tmdSize = getFileSizePath(retailLauncherTmdPath);
 			if (tmdSize > 520)
 			{
 				unlaunchFound = true;
-				unlaunchPatches = checkIfUnlaunchHasPatches(launcherTmdPath);
+				unlaunchPatches = checkIfUnlaunchHasPatches(retailLauncherTmdPath);
 			}
 			else if(tmdSize != 520)
 			{
-				hasTitleTmdMatchingLauncher = false;
-			}
-			// I own and know of many people with retail and dev prototypes
-			// These can normally be identified by having the region set to ALL (0x41)
-			if (region == 0x41 || region == 0xFF)
-			{
-				notProto = false;
-				hasTitleTmdMatchingLauncher = true;
+				//if size isn't 520 then the tmd either is not present (size 0), or is already invalid, thus no need to patch
+				retailLauncherTmdPresentAndToBePatched = false;
 			}
 			// HWINFO_S may not always exist (PRE_IMPORT). Fill in defaults if that happens.
-		} else {
-			sprintf(launcherTmdPath, "nand:/title/00030017/484e4141/content/title.tmd");
-			notProto = false;
-			hasTitleTmdMatchingLauncher = true;
 		}
+		
+		// I own and know of many people with retail and dev prototypes
+		// These can normally be identified by having the region set to ALL (0x41)
+		retailConsole = (region != 0x41 && region != 0xFF);
 		
 		if (!unlaunchFound)
 		{
@@ -407,267 +279,32 @@ int main(int argc, char **argv)
 				break;
 
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL:
-				if(hasTitleTmdMatchingLauncher && nandio_unlock_writing())
+				if(unlaunchFound)
 				{
-					if (notProto) {
-						if (!toggleReadOnly(launcherTmdPath, false) || !restoreMainTmd(launcherTmdPath))
-						{
-							messageBox("\x1B[31mError:\x1B[33m Uninstall failed\n");
-							nandio_lock_writing();
-							break;
-						}
+					messageBox("\x1B[31mError:\x1B[33m Unlaunch is not installed\n");
+				} else if(nandio_unlock_writing()) {
+					if(uninstallUnlaunch(retailConsole, retailLauncherTmdPath))
+					{
+						messageBox("Uninstall successful!\n");
 					} else {
-						if (!toggleReadOnly("nand:/title/00030017/484e4141/content/title.tmd", false) || !restoreProtoTmd("nand:/title/00030017/484e4141/content/title.tmd")) {
-							messageBox("\x1B[31mError:\x1B[33m Uninstall failed\n");
-							nandio_lock_writing();
-							break;
-						}
+						messageBox("\x1B[31mError:\x1B[33m Uninstall failed\n");
 					}
 					nandio_lock_writing();
-					messageBox("Uninstall successful!\n");
-				} else {
-					messageBox("\x1B[31mError:\x1B[33m Unlaunch is not installed\n");
 				}
 				break;
 
 			case MAIN_MENU_SAFE_UNLAUNCH_INSTALL:
 				if (unlaunchInstallerFound && (choiceBox("Install unlaunch?") == YES)
-					&& (hasTitleTmdMatchingLauncher || (choiceBox("There doesn't seem to be a launcher.tmd\nfile matcing the hwinfo file\nKeep installing?") == YES))
+					&& (retailLauncherTmdPresentAndToBePatched || (choiceBox("There doesn't seem to be a launcher.tmd\nfile matcing the hwinfo file\nKeep installing?") == YES))
 					&& nandio_unlock_writing())
 				{
-					
-					FILE* unlaunchInstaller = fopen("sd:/unlaunch.dsi", "rb");
-					if (!unlaunchInstaller)
+					if(installUnlaunch(retailConsole, retailLauncherTmdPresentAndToBePatched ? retailLauncherTmdPath : NULL))
 					{
-						messageBox("\x1B[31mError:\x1B[33m Failed to open unlaunch installer\n(sd:/unlaunch.dsi)\n");
-						nandio_lock_writing();
-						break;
+						messageBox("Install successful!\n");
+					} else {
+						messageBox("\x1B[31mError:\x1B[33m Install failed\n");
 					}
-
-					// Treat protos differently
-					if (!notProto)
-					{
-						if (choiceBox("Your DSi has a non-standard\nregion.\n\x1B[31mInstalling unlaunch may be\nunsafe.\x1B[33m\nCancelling is recommended!\n\nContinue anyways?") == YES)
-						{
-							// Prototypes DSis are always HNAA. We can't use code that will nuke their launcher.
-							
-							// Also some justification for adding proto support: they're really common.
-							// "Real" protos (X3, X4, etc) are hard to find but there are tons of release
-							// version DSis that are running prototype firmware. 
-							// Likely factory rejects that never had production firmware flashed.
-
-							// We have to remove write protect otherwise reinstalling will fail.
-							if (access(hnaaTmdPath, F_OK) == 0) {
-								if (!toggleReadOnly(hnaaTmdPath, false))
-								{
-									fclose(unlaunchInstaller);
-									messageBox("\x1B[31mError:\x1B[33m Can't remove launcher tmd write protect\n");
-									nandio_lock_writing();
-									break;
-								}
-							}
-							bool hnaaBackupExists = false;
-							hnaaBackupExists = (access("nand:/title/00030017/484e4141/content/title.tmd.bak", F_OK) == 0);
-							// Back up the TMD since we'll be writing to it directly.
-							if (!hnaaBackupExists)
-							{
-								copyFile(hnaaTmdPath, "nand:/title/00030017/484e4141/content/title.tmd.bak");
-							}
-							FILE* targetTmd = fopen(hnaaTmdPath, "wb");
-							if (!targetTmd)
-							{
-								fclose(unlaunchInstaller);
-								messageBox("\x1B[31mError:\x1B[33m Failed to open target unlaunch tmd\n");
-								nandio_lock_writing();
-								break;
-							}
-
-							{
-								char buffer[1024] = {0};
-								//write the first 520 bytes as 0, as that's the size of a tmd, but it can be whatever content
-								if (fwrite(buffer, sizeof(char), 520, targetTmd) != 520)
-								{
-									fclose(unlaunchInstaller);
-									fclose(targetTmd);
-									messageBox("\x1B[31mError:\x1B[33m Failed write to unlaunch to tmd\n");
-									copyFile("nand:/title/00030017/484e4141/content/title.tmd.bak", hnaaTmdPath);
-									nandio_lock_writing();
-									break;
-								}
-								
-								size_t n;
-								bool failed = false;
-
-								while ((n = fread(buffer, sizeof(char), sizeof(buffer), unlaunchInstaller)) > 0)
-								{
-									if (fwrite(buffer, sizeof(char), n, targetTmd) != n)
-									{
-										fclose(unlaunchInstaller);
-										fclose(targetTmd);
-										messageBox("\x1B[31mError:\x1B[33m Failed write unlaunch to tmd\n");
-										copyFile("nand:/title/00030017/484e4141/content/title.tmd.bak", hnaaTmdPath);
-										nandio_lock_writing();
-										failed = true;
-										break;
-									}
-								}
-								if (failed)
-									break;
-								if (!feof(unlaunchInstaller) || ferror(unlaunchInstaller))
-								{
-									fclose(unlaunchInstaller);
-									fclose(targetTmd);
-									messageBox("\x1B[31mError:\x1B[33m Failed read unlaunch installer\n");
-									copyFile("nand:/title/00030017/484e4141/content/title.tmd.bak", hnaaTmdPath);
-									nandio_lock_writing();
-									break;
-								}
-							}				
-							fclose(unlaunchInstaller);	
-							fclose(targetTmd);
-
-							// Mark the tmd as readonly
-							if (!toggleReadOnly(hnaaTmdPath, true))
-							{
-								// There is nothing that can be done at this point.
-								messageBox("\x1B[31mError:\x1B[33m Failed to mark tmd as read only\n");
-							}
-							nandio_lock_writing();
-							unlaunchFound = true;
-							messageBox("Unlaunch has been installed.\n");
-						} else {
-							nandio_lock_writing();
-							messageBox("Unlaunch install cancelled.\n");
-							break;
-						}
-					}
-					// Do things normally for production units
-					else 
-					{
-						//Create HNAA launcher folder
-						if (!safeCreateDir("nand:/title/00030017")
-							|| !safeCreateDir("nand:/title/00030017/484e4141")
-							|| !safeCreateDir("nand:/title/00030017/484e4141/content")) {
-							nandio_lock_writing();
-							break;
-						}
-
-						// We have to remove write protect otherwise reinstalling will fail.
-						if (access(hnaaTmdPath, F_OK) == 0) {
-							if (!toggleReadOnly(hnaaTmdPath, false))
-							{
-								fclose(unlaunchInstaller);
-								messageBox("\x1B[31mError:\x1B[33m Can't remove launcher tmd write protect\n");
-								nandio_lock_writing();
-								break;
-							}
-						}
-						FILE* targetTmd = fopen(hnaaTmdPath, "wb");
-						if (!targetTmd)
-						{
-							fclose(unlaunchInstaller);
-							messageBox("\x1B[31mError:\x1B[33m Failed to open target unlaunch tmd\n");
-							rmdir("nand:/title/00030017/484e4141/content");
-							rmdir("nand:/title/00030017/484e4141");
-							nandio_lock_writing();
-							break;
-						}
-						
-						{
-							char buffer[1024] = {0};
-							//write the first 520 bytes as 0, as that's the size of a tmd, but it can be whatever content
-							if (fwrite(buffer, sizeof(char), 520, targetTmd) != 520)
-							{
-								fclose(unlaunchInstaller);
-								fclose(targetTmd);
-								messageBox("\x1B[31mError:\x1B[33m Failed write to target unlaunch tmd\n");
-								remove("nand:/title/00030017/484e4141/content/title.tmd");
-								rmdir("nand:/title/00030017/484e4141/content");
-								rmdir("nand:/title/00030017/484e4141");
-								nandio_lock_writing();
-								break;
-							}
-							
-							size_t n;
-							bool failed = false;
-
-							while ((n = fread(buffer, sizeof(char), sizeof(buffer), unlaunchInstaller)) > 0)
-							{
-								if (fwrite(buffer, sizeof(char), n, targetTmd) != n)
-								{
-									fclose(unlaunchInstaller);
-									fclose(targetTmd);
-									messageBox("\x1B[31mError:\x1B[33m Failed write to target unlaunch tmd\n");
-									remove("nand:/title/00030017/484e4141/content/title.tmd");
-									rmdir("nand:/title/00030017/484e4141/content");
-									rmdir("nand:/title/00030017/484e4141");
-									nandio_lock_writing();
-									failed = true;
-									break;
-								}
-							}
-							if (failed)
-								break;
-							if (!feof(unlaunchInstaller) || ferror(unlaunchInstaller))
-							{
-								fclose(unlaunchInstaller);
-								fclose(targetTmd);
-								messageBox("\x1B[31mError:\x1B[33m Failed read unlaunch installer\n");
-								remove("nand:/title/00030017/484e4141/content/title.tmd");
-								rmdir("nand:/title/00030017/484e4141/content");
-								rmdir("nand:/title/00030017/484e4141");
-								nandio_lock_writing();
-								break;
-							}
-						}				
-						fclose(unlaunchInstaller);	
-						fclose(targetTmd);
-
-						//Mark the tmd as readonly
-						if(!toggleReadOnly(hnaaTmdPath, true))
-						{
-							messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as read only\n");
-							remove("nand:/title/00030017/484e4141/content/title.tmd");
-							rmdir("nand:/title/00030017/484e4141/content");
-							rmdir("nand:/title/00030017/484e4141");
-							nandio_lock_writing();
-							break;
-						}
-
-						//Finally patch the default launcher tmd to be invalid
-						//If there isn't a title.tmd matching the language region in the hwinfo
-						// nothing else has to be done, could be a language patch, or a dev system, the user will know what they have done
-						if (hasTitleTmdMatchingLauncher)
-						{
-							// Set tmd as writable in case unlaunch was already installed through the old method
-							if(!toggleReadOnly(launcherTmdPath, false) || !patchMainTmd(launcherTmdPath))
-							{
-								if(!toggleReadOnly(hnaaTmdPath, false))
-								{
-									messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n");
-								}
-								else
-								{
-									remove("nand:/title/00030017/484e4141/content/title.tmd");
-									rmdir("nand:/title/00030017/484e4141/content");
-									rmdir("nand:/title/00030017/484e4141");
-								}
-								nandio_lock_writing();
-								break;
-							}
-							if (!toggleReadOnly(launcherTmdPath, true))
-							{
-	#if 0
-								// TODO: Rollback or live with it?
-								messageBox("\x1B[31mError:\x1B[33m Failed to mark default launcher's title.tmd\nas read only, reverting the changes\n");
-								restoreMainTmd(launcherTmdPath)
-	#endif
-							}
-						}
-						nandio_lock_writing();
-						unlaunchFound = true;
-						messageBox("Unlaunch has been installed.\n");
-					}
+					nandio_lock_writing();
 				}
 				break;
 

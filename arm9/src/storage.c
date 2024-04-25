@@ -194,6 +194,29 @@ bool padFile(char const* path, int size)
 	return true;
 }
 
+bool toggleFileReadOnly(const char* path, bool readOnly)
+{
+	int fatAttributes = FAT_getAttr(path);
+	if (readOnly)
+		fatAttributes |= ATTR_READONLY;
+	else
+		fatAttributes &= ~ATTR_READONLY;
+	return FAT_setAttr(path, fatAttributes) == 0;
+}
+
+bool writeToFile(FILE* fd, const char* buffer, size_t size)
+{
+	int toWrite = size;
+	size_t written;
+	//write the first 520 bytes as 0, as that's the size of a tmd, but it can be whatever content
+	while (toWrite > 0 && (written = fwrite(buffer, sizeof(char), toWrite, fd)) > 0)
+	{
+		toWrite -= written;
+		buffer += written;
+	}
+	return toWrite != 0;
+}
+
 //directories
 bool dirExists(char const* path)
 {
@@ -422,6 +445,18 @@ unsigned long long getDirSize(const char* path, u32 blockSize)
 
 	closedir(dir);
 	return size;
+}
+
+bool safeCreateDir(const char* path)
+{
+	if (((mkdir(path, 0777) == 0) || errno == EEXIST))
+		return true;
+	
+	char errorStr[512];
+	sprintf(errorStr, "\x1B[31mError:\x1B[33m Failed to create directory (%s)\n", path);
+	
+	messageBox(errorStr);
+	return false;
 }
 
 //home menu
