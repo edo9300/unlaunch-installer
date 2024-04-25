@@ -5,4 +5,6 @@
 bool uninstallUnlaunch(bool notProto, const char* retailLauncherTmdPath);
 bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath);
 
+bool isLauncherTmdPatched(const char* path);
+
 #endif

@@ -8,6 +8,20 @@
 static char unlaunchInstallerBuffer[0x30000];
 static const char* hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd";
 
+bool isLauncherTmdPatched(const char* path)
+{
+	FILE* launcherTmd = fopen(path, "rb");
+	if(!launcherTmd)
+	{
+		return false;
+	}
+	fseek(launcherTmd, 0x190, SEEK_SET);
+	char c;
+	fread(&c, 1, 1, launcherTmd);
+	fclose(launcherTmd);
+	return c == 0x47;
+}
+
 static bool restoreMainTmd(const char* path)
 {
 	FILE* launcherTmd = fopen(path, "r+b");

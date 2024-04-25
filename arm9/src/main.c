@@ -203,6 +203,7 @@ int main(int argc, char **argv)
 	const char* hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd";
 	{
 		FILE* file = fopen("nand:/sys/HWINFO_S.dat", "rb");
+		bool mainTmdIsPatched = false;
 		if (file)
 		{
 			fseek(file, 0xA0, SEEK_SET);
@@ -224,6 +225,10 @@ int main(int argc, char **argv)
 				//if size isn't 520 then the tmd either is not present (size 0), or is already invalid, thus no need to patch
 				retailLauncherTmdPresentAndToBePatched = false;
 			}
+			else
+			{
+				mainTmdIsPatched = isLauncherTmdPatched(retailLauncherTmdPath);
+			}
 			// HWINFO_S may not always exist (PRE_IMPORT). Fill in defaults if that happens.
 		}
 		
@@ -231,7 +236,7 @@ int main(int argc, char **argv)
 		// These can normally be identified by having the region set to ALL (0x41)
 		retailConsole = (region != 0x41 && region != 0xFF);
 		
-		if (!unlaunchFound)
+		if (!unlaunchFound && (mainTmdIsPatched || !retailConsole))
 		{
 			unsigned long long tmdSize = getFileSizePath(hnaaTmdPath);
 			if (tmdSize > 520)
