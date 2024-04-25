@@ -212,6 +212,18 @@ bool patchMainTmd(const char* path)
 		fclose(launcherTmd);
 		return false;
 	}
+	if (unlaunchFound) {
+		// Remove unlaunch if it already exists on the main launcher tmd.
+		// If we don't do this and unlaunch is on the tmd, it will take over and prevent loading HNAA 
+		messageBox(" Unlaunch is already installed \nwith the legacy method\nTrying to remove...\n");
+		if (ftruncate(fileno(launcherTmd), 520) != 0) {
+    		messageBox("\x1B[31mError:\x1B[33m Failed to remove old unlaunch\n");
+   			fclose(launcherTmd);
+   			return false;
+			}
+			fclose(launcherTmd);
+   		return true;
+	}
 	fclose(launcherTmd);
 	return true;
 }
@@ -238,7 +250,12 @@ bool restoreMainTmd(const char* path)
 	else if(c != 0x47)
 	{
 		if (unlaunchFound) {
-			// Trim the old unlaunch installed TMDs to 520b
+			// Remove unlaunch if it already exists on the main launcher tmd.
+			// If we don't do this and unlaunch is on the tmd, it will take over and prevent loading HNAA 
+
+			// This is also a good idea to make sure the tmd is 520b. 
+			// You will have a much higher brick risk if something goes wrong with a tmd over 520b.
+			// See: http://docs.randommeaninglesscharacters.com/unlaunch.html
 			messageBox(" Unlaunch was installed with the legacy method\nTrimming tmd\n");
 			if (ftruncate(fileno(launcherTmd), 520) != 0) {
         		messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
@@ -535,8 +552,6 @@ int main(int argc, char **argv)
 							break;
 						}
 
-
-
 						// We have to remove write protect otherwise reinstalling will fail.
 						if (access(hnaaTmdPath, F_OK) == 0) {
 							if (!toggleReadOnly(hnaaTmdPath, false))
@@ -624,7 +639,8 @@ int main(int argc, char **argv)
 						// nothing else has to be done, could be a language patch, or a dev system, the user will know what they have done
 						if (hasTitleTmdMatchingLauncher)
 						{
-							if(!patchMainTmd(launcherTmdPath))
+							// Set tmd as writable in case unlaunch was already installed through the old method
+							if(!toggleReadOnly(launcherTmdPath, false) || !patchMainTmd(launcherTmdPath))
 							{
 								if(!toggleReadOnly(hnaaTmdPath, false))
 								{
