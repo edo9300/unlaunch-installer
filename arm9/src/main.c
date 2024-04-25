@@ -279,7 +279,7 @@ int main(int argc, char **argv)
 				break;
 
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL:
-				if(unlaunchFound)
+				if(!unlaunchFound)
 				{
 					messageBox("\x1B[31mError:\x1B[33m Unlaunch is not installed\n");
 				} else if(nandio_unlock_writing()) {
