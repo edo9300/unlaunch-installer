@@ -66,7 +66,7 @@ static int mainMenu(int cursor)
 
 	char uninstallStr[32], installStr[32];
 	sprintf(uninstallStr, "\x1B[%02omUninstall unlaunch", unlaunchFound ? 047 : 037);
-	sprintf(installStr, "\x1B[%02omInstall unlaunch", unlaunchInstallerFound ? 047 : 037);
+	sprintf(installStr, "\x1B[%02omInstall unlaunch", unlaunchInstallerFound && !unlaunchFound ? 047 : 037);
 	addMenuItem(m, uninstallStr, NULL, 0);
 	addMenuItem(m, installStr, NULL, 0);
 	addMenuItem(m, "\x1B[47mExit", NULL, 0);

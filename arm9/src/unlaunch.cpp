@@ -128,18 +128,7 @@ static bool patchMainTmd(const char* path)
 		fclose(launcherTmd);
 		return false;
 	}
-	if (getFileSize(launcherTmd) > 520) {
-		// Remove unlaunch if it already exists on the main launcher tmd.
-		// If we don't do this and unlaunch is on the tmd, it will take over and prevent loading HNAA 
-		messageBox("Unlaunch is already installed \nwith the legacy method\nTrying to remove...\n");
-		if (ftruncate(fileno(launcherTmd), 520) != 0) {
-			messageBox("\x1B[31mError:\x1B[33m Failed to remove old unlaunch\n");
-   			fclose(launcherTmd);
-   			return false;
-		}
-		fclose(launcherTmd);
-   		return true;
-	}
+	
 	fclose(launcherTmd);
 	return true;
 }
