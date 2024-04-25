@@ -57,7 +57,16 @@ void getConsoleID(u8 *consoleID)
 	u8 key[16]; //key3 normalkey - keyslot 3 is used for DSi/twln NAND crypto
 	u8 key_x[16];////key3_x - contains a DSi console id (which just happens to be the LFCS on 3ds)
 
+	u8 empty_buff[8] = {0};
+
 	memcpy(key, fifo, 16);  //receive the goods from arm7
+	
+	if(memcmp(key + 8, empty_buff, 8) == 0)
+	{
+		//we got the consoleid directly or nothing at all, don't treat this as key3 output
+		memcpy(consoleID, key, 8);
+		return;
+	}
 
 	F_XY_reverse(key, key_x); //work backwards from the normalkey to get key_x that has the consoleID
 
@@ -87,6 +96,7 @@ bool nandio_startup()
 	{
 		consoleIDfixed[i] = consoleID[7-i];
 	}
+	
 	// iprintf("sector 0 is %s\n", is3DS ? "3DS" : "DSi");
 	dsi_crypt_init((const u8*)consoleIDfixed, (const u8*)0x2FFD7BC, is3DS);
 	dsi_nand_crypt(sector_buf, sector_buf, 0, SECTOR_SIZE / AES_BLOCK_SIZE);
