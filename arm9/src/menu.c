@@ -1,6 +1,9 @@
 #include "menu.h"
 #include "main.h"
 
+#define sign(X) ( ((X) > 0) - ((X) < 0) )
+#define repeat(X) for (int _I_ = 0; _I_ < (X); _I_++)
+
 Menu* newMenu()
 {
 	Menu* m = (Menu*)malloc(sizeof(Menu));

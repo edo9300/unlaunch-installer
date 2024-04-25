@@ -7,6 +7,7 @@
 
 static char unlaunchInstallerBuffer[0x30000];
 static const char* hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd";
+static const char* hnaaBackupTmdPath = "nand:/title/00030017/484e4141/content/title.tmd.bak";
 
 bool isLauncherTmdPatched(const char* path)
 {
@@ -110,16 +111,14 @@ static bool patchMainTmd(const char* path)
 
 static bool restoreProtoTmd(const char* path)
 {
-	bool hnaaBackupExists = false;
-	hnaaBackupExists = (access("nand:/title/00030017/484e4141/content/title.tmd.bak", F_OK) == 0);
-	if (!hnaaBackupExists)
+	if (!fileExists(hnaaBackupTmdPath))
 	{
 		messageBox("\x1B[31mError:\x1B[33m No original tmd found!\nCan't uninstall unlaunch.\n");
 		return false;
 	}
 	remove(path);
-	copyFile("nand:/title/00030017/484e4141/content/title.tmd.bak", path);
-	remove("nand:/title/00030017/484e4141/content/title.tmd.bak");
+	rename(hnaaBackupTmdPath, path);
+	toggleFileReadOnly(path, false);
 	return true;
 }
 
@@ -170,7 +169,7 @@ static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath)
 	}
 
 	// We have to remove write protect otherwise reinstalling will fail.
-	if (access(hnaaTmdPath, F_OK) == 0 && !toggleFileReadOnly(hnaaTmdPath, false)) {
+	if (fileExists(hnaaTmdPath) && !toggleFileReadOnly(hnaaTmdPath, false)) {
 		messageBox("\x1B[31mError:\x1B[33m Can't remove launcher tmd write protect\n");
 		return false;
 	}
@@ -240,15 +239,15 @@ static bool installUnlaunchProtoConsole(void)
 	// Likely factory rejects that never had production firmware flashed.
 
 	// We have to remove write protect otherwise reinstalling will fail.
-	if (access(hnaaTmdPath, F_OK) == 0 && !toggleFileReadOnly(hnaaTmdPath, false)) {
+	if (fileExists(hnaaTmdPath) && !toggleFileReadOnly(hnaaTmdPath, false)) {
 		messageBox("\x1B[31mError:\x1B[33m Can't remove launcher tmd write protect\n");
 		return false;
 	}
-	bool hnaaBackupExists = (access("nand:/title/00030017/484e4141/content/title.tmd.bak", F_OK) == 0);
+	bool hnaaBackupExists = fileExists(hnaaBackupTmdPath);
 	// Back up the TMD since we'll be writing to it directly.
 	if (!hnaaBackupExists)
 	{
-		rename(hnaaTmdPath, "nand:/title/00030017/484e4141/content/title.tmd.bak");
+		rename(hnaaTmdPath, hnaaBackupTmdPath);
 		// Mark backup tmd as readonly, just to be sure
 		toggleFileReadOnly("nand:/title/00030017/484e4141/content/title.tmd.bak", true);
 	}
