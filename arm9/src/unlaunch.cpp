@@ -165,15 +165,20 @@ bool uninstallUnlaunch(bool retailConsole, const char* retailLauncherTmdPath)
 
 static bool writeUnlaunchTmd(const char* path)
 {
+	Sha1Digest expectedDigest, actualDigest;
+	swiSHA1Calc(expectedDigest.data(), unlaunchInstallerBuffer, unlaunchInstallerSize + 520);
+	if(calculateFileSha1Path(path, actualDigest.data()) && expectedDigest == actualDigest)
+	{
+		// the tmd hasn't changed, no need to do anything
+		return true;
+	}
+	
 	FILE* targetTmd = fopen(path, "wb");
 	if (!targetTmd)
 	{
 		messageBox("\x1B[31mError:\x1B[33m Failed to open target unlaunch tmd\n");
 		return false;
 	}
-
-	Sha1Digest expectedDigest, actualDigest;
-	swiSHA1Calc(expectedDigest.data(), unlaunchInstallerBuffer, unlaunchInstallerSize + 520);
 	
 	if(!writeToFile(targetTmd, unlaunchInstallerBuffer, unlaunchInstallerSize + 520))
 	{
@@ -182,10 +187,10 @@ static bool writeUnlaunchTmd(const char* path)
 		messageBox("\x1B[31mError:\x1B[33m Failed write unlaunch to tmd\n");
 		return false;
 	}
-	fclose(targetTmd);
-	calculateFileSha1Path(path, actualDigest.data());
 	
-	if(expectedDigest != actualDigest)
+	fclose(targetTmd);
+	
+	if(!calculateFileSha1Path(path, actualDigest.data()) || expectedDigest != actualDigest)
 	{
 		remove(path);
 		messageBox("\x1B[31mError:\x1B[33m Unlaunch tmd was not properly written\n");
