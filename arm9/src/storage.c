@@ -214,7 +214,7 @@ bool writeToFile(FILE* fd, const char* buffer, size_t size)
 		toWrite -= written;
 		buffer += written;
 	}
-	return toWrite != 0;
+	return toWrite == 0;
 }
 
 //directories

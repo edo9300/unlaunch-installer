@@ -1,6 +1,7 @@
 #include "message.h"
 #include "storage.h"
 #include "unlaunch.h"
+#include <string.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -137,6 +138,7 @@ static bool writeUnlaunchTmd(const char* path)
 	if(!writeToFile(targetTmd, unlaunchInstallerBuffer, sizeof(unlaunchInstallerBuffer)))
 	{
 		fclose(targetTmd);
+		remove(path);
 		messageBox("\x1B[31mError:\x1B[33m Failed write unlaunch to tmd\n");
 		return false;
 	}
@@ -204,7 +206,6 @@ static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath)
 #endif
 		}
 	}
-	messageBox("Unlaunch has been installed.\n");
 	return true;
 }
 
@@ -261,19 +262,26 @@ bool readUnlaunchInstaller(void)
 		messageBox("\x1B[31mError:\x1B[33m Failed to open unlaunch installer\n(sd:/unlaunch.dsi)\n");
 		return false;
 	}
+	
+	int toRead = sizeof(unlaunchInstallerBuffer) - 520;
+	size_t installerFilesize = getFileSize(unlaunchInstaller);
+	if(installerFilesize != toRead)
+	{
+		messageBox("\x1B[31mError:\x1B[33m Unlaunch installer wrong file size\n");
+		return false;
+	}
 
 	char* buff = unlaunchInstallerBuffer;
 	// Pad the installer with 520 bytes, those being the size of a valid tmd
 	buff += 520;
 
-	int toRead = sizeof(unlaunchInstallerBuffer) - 520;
 	size_t n = 0;
 	while (toRead != 0 && (n = fread(buff, sizeof(char), toRead, unlaunchInstaller)) > 0)
 	{
 		toRead -= n;
 		buff += n;
 	}
-	if (toRead != 0 || !feof(unlaunchInstaller) || ferror(unlaunchInstaller))
+	if (toRead != 0 || ferror(unlaunchInstaller))
 	{
 		fclose(unlaunchInstaller);
 		messageBox("\x1B[31mError:\x1B[33m Failed read unlaunch installer\n");
