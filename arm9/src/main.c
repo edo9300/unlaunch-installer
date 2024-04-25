@@ -50,7 +50,7 @@ static void _setupScreens()
 	vramSetBankA(VRAM_A_MAIN_BG);
 	vramSetBankC(VRAM_C_SUB_BG);
 
-	consoleInit(&topScreen,    3, BgType_Text4bpp, BgSize_T_256x256, 31, 0, true,  true);
+	consoleInit(&topScreen, 3, BgType_Text4bpp, BgSize_T_256x256, 31, 0, true, true);
 	consoleInit(&bottomScreen, 3, BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
 
 	clearScreen(&bottomScreen);
@@ -217,7 +217,7 @@ bool patchMainTmd(const char* path)
 		// If we don't do this and unlaunch is on the tmd, it will take over and prevent loading HNAA 
 		messageBox(" Unlaunch is already installed \nwith the legacy method\nTrying to remove...\n");
 		if (ftruncate(fileno(launcherTmd), 520) != 0) {
-    		messageBox("\x1B[31mError:\x1B[33m Failed to remove old unlaunch\n");
+			messageBox("\x1B[31mError:\x1B[33m Failed to remove old unlaunch\n");
    			fclose(launcherTmd);
    			return false;
 			}
@@ -258,12 +258,12 @@ bool restoreMainTmd(const char* path)
 			// See: http://docs.randommeaninglesscharacters.com/unlaunch.html
 			messageBox(" Unlaunch was installed with the legacy method\nTrimming tmd\n");
 			if (ftruncate(fileno(launcherTmd), 520) != 0) {
-        		messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
-       			fclose(launcherTmd);
-       			return false;
+				messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
+	   			fclose(launcherTmd);
+	   			return false;
    			}
    			fclose(launcherTmd);
-       		return true;
+	   		return true;
 		}
 		messageBox("\x1B[31mError:\x1B[33m Unlaunch was installed with an\nunknown method\naborting\n");
 		fclose(launcherTmd);
