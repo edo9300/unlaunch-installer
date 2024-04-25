@@ -5,7 +5,7 @@ ifeq ($(strip $(DEVKITARM)),)
 $(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
 endif
 
-export TARGET	:=	NTM-unlaunch
+export TARGET	:=	unlaunch-installer
 export TOPDIR	:=	$(CURDIR)
 
 # specify a directory which contains the nitro filesystem
@@ -13,11 +13,11 @@ export TOPDIR	:=	$(CURDIR)
 NITRO_FILES	:=
 
 # These set the information text in the nds file
-GAME_TITLE		:=	NAND Title Manager
-GAME_SUBTITLE1	:=	JeffRuLz, Pk11
+GAME_TITLE		:=	Safe Unlaunch installer
+GAME_SUBTITLE1	:=	edo9300
 
-GAME_CODE		:= HTMA
-GAME_LABEL		:= NANDTM
+GAME_CODE		:= UNLI
+GAME_LABEL		:= UNLINS
 
 include $(DEVKITARM)/ds_rules
 
