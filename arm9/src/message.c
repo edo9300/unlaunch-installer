@@ -13,7 +13,7 @@ void keyWait(u32 key)
 	}
 }
 
-bool choiceBox(char* message)
+bool choiceBox(const char* message)
 {
 	const int choiceRow = 10;
 	int cursor = 0;
@@ -53,7 +53,7 @@ bool choiceBox(char* message)
 	return (cursor == 0)? YES: NO;
 }
 
-bool choicePrint(char* message)
+bool choicePrint(const char* message)
 {
 	bool choice = NO;
 
@@ -87,7 +87,7 @@ bool choicePrint(char* message)
 const static u16 keys[] = {KEY_UP, KEY_DOWN, KEY_RIGHT, KEY_LEFT, KEY_A, KEY_B, KEY_X, KEY_Y};
 const static char *keysLabels[] = {"\x18", "\x19", "\x1A", "\x1B", "<A>", "<B>", "<X>", "<Y>"};
 
-bool randomConfirmBox(char* message)
+bool randomConfirmBox(const char* message)
 {
 	const int choiceRow = 10;
 	int sequencePosition = 0;
@@ -137,13 +137,13 @@ bool randomConfirmBox(char* message)
 	return sequencePosition == sizeof(sequence);
 }
 
-void messageBox(char* message)
+void messageBox(const char* message)
 {
 	clearScreen(&bottomScreen);
 	messagePrint(message);
 }
 
-void messagePrint(char* message)
+void messagePrint(const char* message)
 {
 	iprintf("%s\n", message);
 	iprintf("\nOkay - [A]\n");

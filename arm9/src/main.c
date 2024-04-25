@@ -56,7 +56,7 @@ static int mainMenu(int cursor)
 			"\nlow, of \x1B[41mbricking\x1B[47m your system"
 			"\nand should be done with caution!\n");
 	iprintf("\n\t  \x1B[46mhttps://dsi.cfw.guide\x1B[47m\n");
-	iprintf("\x1b[23;0HJeff - 2018-2019");
+	iprintf("\x1b[21;0HJeff - 2018-2019");
 	iprintf("\x1b[22;0HPk11 - 2022-2023");
 	iprintf("\x1b[23;0Hedo9300 - 2024");
 
@@ -67,7 +67,6 @@ static int mainMenu(int cursor)
 	char uninstallStr[32], installStr[32];
 	sprintf(uninstallStr, "\x1B[%02omUninstall unlaunch", unlaunchFound ? 047 : 037);
 	sprintf(installStr, "\x1B[%02omInstall unlaunch", unlaunchInstallerFound ? 047 : 037);
-	addMenuItem(m, uninstallStr, NULL, 0);
 	addMenuItem(m, uninstallStr, NULL, 0);
 	addMenuItem(m, installStr, NULL, 0);
 	addMenuItem(m, "\x1B[47mExit", NULL, 0);
@@ -139,7 +138,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	
-	unlaunchInstallerFound = fileExists("sd:/unlaunch.dsi");
+	unlaunchInstallerFound = loadUnlaunchInstaller("sd:/unlaunch.dsi");
 	if (!unlaunchInstallerFound)
 	{
 		messageBox("\x1B[41mWARNING:\x1B[47m unlaunch.dsi was not found in\n"

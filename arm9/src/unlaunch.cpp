@@ -1,6 +1,10 @@
 #include "message.h"
+#include "sha1digest.h"
 #include "storage.h"
 #include "unlaunch.h"
+#include <algorithm>
+#include <array>
+#include <nds/sha1.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -8,6 +12,37 @@
 static char unlaunchInstallerBuffer[0x30000];
 static const char* hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd";
 static const char* hnaaBackupTmdPath = "nand:/title/00030017/484e4141/content/title.tmd.bak";
+
+enum UNLAUNCH_VERSION {
+	v1_8,
+	v1_9,
+	v2_0,
+	INVALID,
+};
+
+UNLAUNCH_VERSION installerVersion{INVALID};
+size_t unlaunchInstallerSize{};
+
+constexpr std::array knownUnlaunchHashes{
+	/*"9e6a8d95062533dfc422362f99ff3e24e7de9920"_sha1, // v0.8: blacklisted, doesn't like this install method*/
+	/*"fb0d0ffebda67b786f608bf5cbcb2efee6ab42bb"_sha1, // v0.9: blacklisted, doesn't like this install method*/
+	/*"d710ff585e321082b33456dd4e0568200c9adcc7"_sha1, // v1.0: blacklisted, doesn't like this install method*/
+	/*"4f3e455e0a752d35a219a3ff10ba14a6c98bff13"_sha1, // v1.1: blacklisted, doesn't like this install method*/
+	/*"25db1a47ba84748f911d9f4357bfc417533121c7"_sha1, // v1.2: blacklisted, doesn't like this install method*/
+	/*"068f1d56da02bb4f93fb76d7874e14010c7e7a3d"_sha1, // v1.3: blacklisted, doesn't like this install method*/
+	/*"43197370de74d302ef7c4420059c3ca7d50c4f3d"_sha1, // v1.4: blacklisted, doesn't like this install method*/
+	/*"0525b28cc59b6f7fc00ad592aebadd7257bf7efb"_sha1, // v1.5: blacklisted, doesn't like this install method*/
+	/*"9470a51fde188235052b119f6bfabf6689cb2343"_sha1, // v1.6: blacklisted, doesn't like this install method*/
+	/*"672c11eb535b97b0d32ff580d314a2ad6411d5fe"_sha1, // v1.7: blacklisted, doesn't like this install method*/
+	"b76c2b1722e769c6c0b4b3d4bc73250e41993229"_sha1, // v1.8
+	"f3eb41cba136a3477523155f8b05df14917c55f4"_sha1, // v1.9
+	"15f4a36251d1408d71114019b2825fe8f5b4c8cc"_sha1, // v2.0
+};
+
+bool isValidUnlaunchInstallerSize(size_t size)
+{
+	return size == 163320 /*1.8*/ || size == 196088 /*1.9*/;
+}
 
 bool isLauncherTmdPatched(const char* path)
 {
@@ -148,7 +183,10 @@ static bool writeUnlaunchTmd(const char* path)
 		return false;
 	}
 
-	if(!writeToFile(targetTmd, unlaunchInstallerBuffer, sizeof(unlaunchInstallerBuffer)))
+	Sha1Digest expectedDigest, actualDigest;
+	swiSHA1Calc(expectedDigest.data(), unlaunchInstallerBuffer, unlaunchInstallerSize + 520);
+	
+	if(!writeToFile(targetTmd, unlaunchInstallerBuffer, unlaunchInstallerSize + 520))
 	{
 		fclose(targetTmd);
 		remove(path);
@@ -156,6 +194,14 @@ static bool writeUnlaunchTmd(const char* path)
 		return false;
 	}
 	fclose(targetTmd);
+	calculateFileSha1Path(path, actualDigest.data());
+	
+	if(expectedDigest != actualDigest)
+	{
+		remove(path);
+		messageBox("\x1B[31mError:\x1B[33m Unlaunch tmd was not properly written\n");
+		return false;
+	}
 	return true;
 }
 
@@ -267,23 +313,23 @@ static bool installUnlaunchProtoConsole(void)
 	return true;
 }
 
-bool readUnlaunchInstaller(void)
+bool readUnlaunchInstaller(const char* path)
 {
-	FILE* unlaunchInstaller = fopen("sd:/unlaunch.dsi", "rb");
+	FILE* unlaunchInstaller = fopen(path, "rb");
 	if (!unlaunchInstaller)
 	{
 		messageBox("\x1B[31mError:\x1B[33m Failed to open unlaunch installer\n(sd:/unlaunch.dsi)\n");
 		return false;
 	}
 	
-	int toRead = sizeof(unlaunchInstallerBuffer) - 520;
-	size_t installerFilesize = getFileSize(unlaunchInstaller);
-	if(installerFilesize != toRead)
+	unlaunchInstallerSize = getFileSize(unlaunchInstaller);
+	if(isValidUnlaunchInstallerSize(unlaunchInstallerSize))
 	{
 		messageBox("\x1B[31mError:\x1B[33m Unlaunch installer wrong file size\n");
 		return false;
 	}
 
+	int toRead = unlaunchInstallerSize;
 	char* buff = unlaunchInstallerBuffer;
 	// Pad the installer with 520 bytes, those being the size of a valid tmd
 	buff += 520;
@@ -301,7 +347,22 @@ bool readUnlaunchInstaller(void)
 		return false;
 	}
 
-	fclose(unlaunchInstaller);
+	fclose(unlaunchInstaller);	
+	return true;
+}
+
+bool verifyUnlaunchInstaller(void)
+{
+	Sha1Digest digest;
+	swiSHA1Calc(digest.data(), unlaunchInstallerBuffer + 520,  unlaunchInstallerSize);
+	auto it = std::ranges::find(knownUnlaunchHashes, digest);
+	if(it == knownUnlaunchHashes.end())
+	{
+		messageBox("\x1B[31mError:\x1B[33m Provided unlaunch installer has an unknown hash\n");
+		return false;
+	}
+	auto idx = std::distance(knownUnlaunchHashes.begin(), it);
+	installerVersion = static_cast<UNLAUNCH_VERSION>(idx);
 	return true;
 }
 
@@ -311,9 +372,14 @@ bool patchUnlaunchInstaller(void)
 	return true;
 }
 
+bool loadUnlaunchInstaller(const char* path)
+{
+	return readUnlaunchInstaller(path) && verifyUnlaunchInstaller();
+}
+
 bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath)
 {
-	if (!readUnlaunchInstaller() || !patchUnlaunchInstaller())
+	if (installerVersion == INVALID || !patchUnlaunchInstaller())
 		return false;
 
 	// Treat protos differently

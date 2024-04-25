@@ -2,6 +2,7 @@
 #include "main.h"
 #include "message.h"
 #include <errno.h>
+#include <nds/sha1.h>
 #include <dirent.h>
 
 #define TITLE_LIMIT 39
@@ -173,6 +174,40 @@ bool writeToFile(FILE* fd, const char* buffer, size_t size)
 		buffer += written;
 	}
 	return toWrite == 0;
+}
+
+bool calculateFileSha1(FILE* f, void* digest)
+{
+	fseek(f, 0, SEEK_SET);
+	
+	swiSHA1context_t ctx;
+	ctx.sha_block = 0; //this is weird but it has to be done
+	swiSHA1Init(&ctx);
+	
+	char buffer[512];	
+	size_t n = 0;
+	while ((n = fread(buffer, sizeof(char), sizeof(buffer), f)) > 0)
+	{
+		swiSHA1Update(&ctx, buffer, n);
+	}
+	if (ferror(f) || !feof(f))
+	{
+		return false;
+	}
+	swiSHA1Final(digest, &ctx);
+	return true;
+}
+
+bool calculateFileSha1Path(const char* path, void* digest)
+{
+	FILE* targetFile = fopen(path, "rb");
+	if (!targetFile)
+	{
+		return false;
+	}	
+	bool res = calculateFileSha1(targetFile, digest);
+	fclose(targetFile);
+	return res;
 }
 
 bool safeCreateDir(const char* path)

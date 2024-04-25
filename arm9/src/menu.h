@@ -3,6 +3,10 @@
 
 #include <nds/ndstypes.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ITEMS_PER_PAGE 20
 
 typedef struct {
@@ -33,5 +37,9 @@ void clearMenu(Menu* m);
 void printMenu(Menu* m);
 
 bool moveCursor(Menu* m);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
