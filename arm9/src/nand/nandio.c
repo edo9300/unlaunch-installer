@@ -85,7 +85,7 @@ bool nandio_startup()
 
 	nand_ReadSectors(0, 1, sector_buf);
 	is3DS = parse_ncsd(sector_buf) == 0;
-	//if (is3DS) return false;
+	if (is3DS) return false;
 
 	u8 consoleID[8];
 	u8 consoleIDfixed[8];

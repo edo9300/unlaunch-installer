@@ -5,16 +5,13 @@
 #include "storage.h"
 #include "version.h"
 #include "unlaunch.h"
-#include <errno.h>
-#include <dirent.h>
-#include <time.h>
 
 volatile bool programEnd = false;
+static volatile bool arm7Exiting = false;
 static bool unlaunchFound = false;
 static bool retailLauncherTmdPresentAndToBePatched = true;
 static bool retailConsole = true;
 static bool unlaunchInstallerFound = false;
-bool arm7Exiting = false;
 bool charging = false;
 u8 batteryLevel = 0;
 
@@ -27,7 +24,7 @@ enum {
 	MAIN_MENU_EXIT
 };
 
-static void _setupScreens()
+static void setupScreens()
 {
 	REG_DISPCNT = MODE_FB0;
 	VRAM_A_CR = VRAM_ENABLE;
@@ -46,29 +43,33 @@ static void _setupScreens()
 	VRAM_A[100] = 0xFFFF;
 }
 
-static int _mainMenu(int cursor)
+static int mainMenu(int cursor)
 {
 	//top screen
 	clearScreen(&topScreen);
 
-	iprintf("\t\tNAND Title Manager\n");
-	iprintf("\t\t\tmodified from\n");
-	iprintf("\tTitle Manager for HiyaCFW\n");
+	iprintf("\t\t\"Safe\" unlaunch installer\n");
 	iprintf("\nversion %s\n", VERSION);
-	iprintf("\n\n\x1B[41mWARNING:\x1B[47m This tool can write to\nyour internal NAND!\n\nThis always has a risk, albeit\nlow, of \x1B[41mbricking\x1B[47m your system\nand should be done with caution!\n");
+	iprintf("\n\n\x1B[41mWARNING:\x1B[47m This tool can write to"
+			"\nyour internal NAND!"
+			"\n\nThis always has a risk, albeit"
+			"\nlow, of \x1B[41mbricking\x1B[47m your system"
+			"\nand should be done with caution!\n");
 	iprintf("\n\t  \x1B[46mhttps://dsi.cfw.guide\x1B[47m\n");
-	iprintf("\n\n \x1B[46mgithub.com/Epicpkmn11/NTM/wiki\x1B[47m\n");
-	iprintf("\x1b[22;0HJeff - 2018-2019");
-	iprintf("\x1b[23;0HPk11 - 2022-2023");
+	iprintf("\x1b[23;0HJeff - 2018-2019");
+	iprintf("\x1b[22;0HPk11 - 2022-2023");
+	iprintf("\x1b[23;0Hedo9300 - 2024");
 
 	//menu
 	Menu* m = newMenu();
 	setMenuHeader(m, "MAIN MENU");
 
-	char uninstallStr[32];
-	sprintf(uninstallStr, "\x1B[%02omSafe unlaunch uninstall", unlaunchFound ? 047 : 037);
+	char uninstallStr[32], installStr[32];
+	sprintf(uninstallStr, "\x1B[%02omUninstall unlaunch", unlaunchFound ? 047 : 037);
+	sprintf(installStr, "\x1B[%02omInstall unlaunch", unlaunchInstallerFound ? 047 : 037);
 	addMenuItem(m, uninstallStr, NULL, 0);
-	addMenuItem(m, "\x1B[47mSafe unlaunch install", NULL, 0);
+	addMenuItem(m, uninstallStr, NULL, 0);
+	addMenuItem(m, installStr, NULL, 0);
 	addMenuItem(m, "\x1B[47mExit", NULL, 0);
 
 	m->cursor = cursor;
@@ -94,7 +95,7 @@ static int _mainMenu(int cursor)
 	return result;
 }
 
-void fifoHandlerPower(u32 value32, void* userdata)
+static void fifoHandlerPower(u32 value32, void* userdata)
 {
 	if (value32 == 0x54495845) // 'EXIT'
 	{
@@ -103,7 +104,7 @@ void fifoHandlerPower(u32 value32, void* userdata)
 	}
 }
 
-void fifoHandlerBattery(u32 value32, void* userdata)
+static void fifoHandlerBattery(u32 value32, void* userdata)
 {
 	batteryLevel = value32 & 0xF;
 	charging = (value32 & BIT(7)) != 0;
@@ -111,9 +112,8 @@ void fifoHandlerBattery(u32 value32, void* userdata)
 
 int main(int argc, char **argv)
 {
-	srand(time(0));
 	keysSetRepeat(25, 5);
-	_setupScreens();
+	setupScreens();
 
 	fifoSetValue32Handler(FIFO_USER_01, fifoHandlerPower, NULL);
 	fifoSetValue32Handler(FIFO_USER_03, fifoHandlerBattery, NULL);
@@ -140,6 +140,12 @@ int main(int argc, char **argv)
 	}
 	
 	unlaunchInstallerFound = fileExists("sd:/unlaunch.dsi");
+	if (!unlaunchInstallerFound)
+	{
+		messageBox("\x1B[41mWARNING:\x1B[47m unlaunch.dsi was not found in\n"
+					"the root of the sd card.\n"
+					"Installing unlaunch won't be possible.");
+	}
 
 	//check for unlaunch and region
 	u8 region = 0xff;
@@ -190,14 +196,12 @@ int main(int argc, char **argv)
 	}
 
 	messageBox("\x1B[41mWARNING:\x1B[47m This tool can write to\nyour internal NAND!\n\nThis always has a risk, albeit\nlow, of \x1B[41mbricking\x1B[47m your system\nand should be done with caution!\n\nIf you have not yet done so,\nyou should make a NAND backup.");
-
-	messageBox("If you are following a video\nguide, please stop.\n\nVideo guides for console moddingare often outdated or straight\nup incorrect to begin with.\n\nThe recommended guide for\nmodding your DSi is:\n\n\x1B[46mhttps://dsi.cfw.guide/\x1B[47m\n\nFor more information on using\nNTM, see the official wiki:\n\n\x1B[46mhttps://github.com/Epicpkmn11/\n\t\t\t\t\t\t\t\tNTM/wiki\x1B[47m");
 	//main menu
 	int cursor = 0;
 
 	while (!programEnd)
 	{
-		cursor = _mainMenu(cursor);
+		cursor = mainMenu(cursor);
 
 		switch (cursor)
 		{
