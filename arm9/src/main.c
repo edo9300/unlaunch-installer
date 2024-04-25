@@ -9,6 +9,7 @@
 volatile bool programEnd = false;
 static volatile bool arm7Exiting = false;
 static bool unlaunchFound = false;
+static bool hnaaUnlaunchFound = false;
 static bool retailLauncherTmdPresentAndToBePatched = true;
 static bool retailConsole = true;
 static bool unlaunchInstallerFound = false;
@@ -184,13 +185,11 @@ int main(int argc, char **argv)
 		// These can normally be identified by having the region set to ALL (0x41)
 		retailConsole = (region != 0x41 && region != 0xFF);
 		
-		if (!unlaunchFound && (mainTmdIsPatched || !retailConsole))
+		unsigned long long tmdSize = getFileSizePath(hnaaTmdPath);
+		if (tmdSize > 520)
 		{
-			unsigned long long tmdSize = getFileSizePath(hnaaTmdPath);
-			if (tmdSize > 520)
-			{
-				unlaunchFound = true;
-			}
+			unlaunchFound = (mainTmdIsPatched || !retailConsole);
+			hnaaUnlaunchFound = true;
 		}
 	}
 
@@ -205,11 +204,8 @@ int main(int argc, char **argv)
 		switch (cursor)
 		{
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL:
-				if(!unlaunchFound)
-				{
-					messageBox("\x1B[31mError:\x1B[33m Unlaunch is not installed\n");
-				} else if(nandio_unlock_writing()) {
-					if(uninstallUnlaunch(retailConsole, retailLauncherTmdPath))
+				if(unlaunchFound && nandio_unlock_writing()) {
+					if(uninstallUnlaunch(retailConsole, hnaaUnlaunchFound, retailLauncherTmdPath))
 					{
 						messageBox("Uninstall successful!\n");
 						unlaunchFound = false;

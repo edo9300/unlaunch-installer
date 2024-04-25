@@ -39,6 +39,8 @@ constexpr std::array knownUnlaunchHashes{
 	"15f4a36251d1408d71114019b2825fe8f5b4c8cc"_sha1, // v2.0
 };
 
+static bool writeUnlaunchToHNAAFolder();
+
 bool isValidUnlaunchInstallerSize(size_t size)
 {
 	return size == 163320 /*1.8*/ || size == 196088 /*1.9*/;
@@ -58,7 +60,7 @@ bool isLauncherTmdPatched(const char* path)
 	return c == 0x47;
 }
 
-static bool restoreMainTmd(const char* path)
+static bool restoreMainTmd(const char* path, bool hasHNAABackup)
 {
 	FILE* launcherTmd = fopen(path, "r+b");
 	if(!launcherTmd)
@@ -86,7 +88,42 @@ static bool restoreMainTmd(const char* path)
 			// This is also a good idea to make sure the tmd is 520b.
 			// You will have a much higher brick risk if something goes wrong with a tmd over 520b.
 			// See: http://docs.randommeaninglesscharacters.com/unlaunch.html
-			messageBox(" Unlaunch was installed with the legacy method\nTrimming tmd\n");
+			if(!hasHNAABackup)
+			{
+				auto choiceString = [&]{
+					if(installerVersion != INVALID)
+						return "Unlaunch was installed with the\n"
+								"legacy method.\n"
+								"Before uninstalling it, a\n"
+								"failsafe installation will be\n"
+								"created.\n"
+								"Proceed?";
+					return "Unlaunch was installed with the\n"
+							"legacy method\n"
+							"But a failsafe installation\n"
+							"cannot be created since no valid\n"
+							"unlaunch installer was provided.\n"
+							"Proceed anyways?";
+				}();
+				if(choiceBox(choiceString) == NO)
+				{
+					fclose(launcherTmd);
+					return false;
+				}
+				if(installerVersion != INVALID)
+				{
+					if(!writeUnlaunchToHNAAFolder())
+					{
+						if(choiceBox("Failsafe installation couldn't\n"
+										"be copmleted.\n"
+										"Proceed anyways?") == NO)
+						{
+							fclose(launcherTmd);
+							return false;
+						}
+					}
+				}
+			}
 			if (ftruncate(fileno(launcherTmd), 520) != 0) {
 				messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
 	   			fclose(launcherTmd);
@@ -146,16 +183,20 @@ static bool restoreProtoTmd(const char* path)
 	return true;
 }
 
-bool uninstallUnlaunch(bool retailConsole, const char* retailLauncherTmdPath)
+bool uninstallUnlaunch(bool retailConsole, bool hasHNAABackup, const char* retailLauncherTmdPath)
 {
 	// TODO: handle retailLauncherTmdPresentAndToBePatched = false on retail consoles
 	if (retailConsole) {
-		if (!toggleFileReadOnly(retailLauncherTmdPath, false) || !restoreMainTmd(retailLauncherTmdPath))
+		if (!toggleFileReadOnly(retailLauncherTmdPath, false))
+		{
+			return false;
+		}			
+		if (!restoreMainTmd(retailLauncherTmdPath, hasHNAABackup))
 		{
 			return false;
 		}
 	} else {
-		if (!toggleFileReadOnly("nand:/title/00030017/484e4141/content/title.tmd", false) || !restoreProtoTmd("nand:/title/00030017/484e4141/content/title.tmd"))
+		if (!toggleFileReadOnly(hnaaTmdPath, false) || !restoreProtoTmd(hnaaTmdPath))
 		{
 			return false;
 		}
@@ -199,7 +240,7 @@ static bool writeUnlaunchTmd(const char* path)
 	return true;
 }
 
-static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath)
+static bool writeUnlaunchToHNAAFolder()
 {
 	//Create HNAA launcher folder
 	if (!safeCreateDir("nand:/title/00030017")
@@ -224,12 +265,19 @@ static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath)
 	if(!toggleFileReadOnly(hnaaTmdPath, true))
 	{
 		messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as read only\n");
-		remove("nand:/title/00030017/484e4141/content/title.tmd");
+		remove(hnaaTmdPath);
 		rmdir("nand:/title/00030017/484e4141/content");
 		rmdir("nand:/title/00030017/484e4141");
 		return false;
 	}
+	return true;
+}
 
+static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath)
+{
+	if(!writeUnlaunchToHNAAFolder())
+		return false;
+	
 	//Finally patch the default launcher tmd to be invalid
 	//If there isn't a title.tmd matching the language region in the hwinfo
 	// nothing else has to be done, could be a language patch, or a dev system, the user will know what they have done
@@ -244,7 +292,7 @@ static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath)
 			}
 			else
 			{
-				remove("nand:/title/00030017/484e4141/content/title.tmd");
+				remove(hnaaTmdPath);
 				rmdir("nand:/title/00030017/484e4141/content");
 				rmdir("nand:/title/00030017/484e4141");
 			}
@@ -252,11 +300,7 @@ static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath)
 		}
 		if (!toggleFileReadOnly(retailLauncherTmdPath, true))
 		{
-#if 0
-			// TODO: Rollback or live with it?
-			messageBox("\x1B[31mError:\x1B[33m Failed to mark default launcher's title.tmd\nas read only, reverting the changes\n");
-			restoreMainTmd(retailLauncherTmdPath)
-#endif
+			messageBox("\x1B[31mError:\x1B[33m Failed to mark default launcher's title.tmd\nas read only, install might be unstable\n");
 		}
 	}
 	return true;

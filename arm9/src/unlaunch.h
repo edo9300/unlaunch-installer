@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-bool uninstallUnlaunch(bool notProto, const char* retailLauncherTmdPath);
+bool uninstallUnlaunch(bool notProto, bool hasHNAABackup, const char* retailLauncherTmdPath);
 bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath);
 
 bool isLauncherTmdPatched(const char* path);
