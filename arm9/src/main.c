@@ -12,7 +12,9 @@ static bool unlaunchFound = false;
 static bool hnaaUnlaunchFound = false;
 static bool retailLauncherTmdPresentAndToBePatched = true;
 static bool retailConsole = true;
-static bool unlaunchInstallerFound = false;
+static UNLAUNCH_VERSION foundUnlaunchInstallerVersion = false;
+static bool disableAllPatches = false;
+static bool enableSoundAndSplash = false;
 bool charging = false;
 u8 batteryLevel = 0;
 
@@ -21,6 +23,8 @@ PrintConsole bottomScreen;
 
 enum {
 	MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL,
+	MAIN_MENU_TID_PATCHES,
+	MAIN_MENU_SOUND_SPLASH_PATCHES,
 	MAIN_MENU_SAFE_UNLAUNCH_INSTALL,
 	MAIN_MENU_EXIT
 };
@@ -65,10 +69,18 @@ static int mainMenu(int cursor)
 	Menu* m = newMenu();
 	setMenuHeader(m, "MAIN MENU");
 
-	char uninstallStr[32], installStr[32];
+	char uninstallStr[32], installStr[32], soundPatchesStr[64], tidPatchesStr[32];
 	sprintf(uninstallStr, "\x1B[%02omUninstall unlaunch", unlaunchFound ? 047 : 037);
-	sprintf(installStr, "\x1B[%02omInstall unlaunch", unlaunchInstallerFound && !unlaunchFound ? 047 : 037);
+	sprintf(tidPatchesStr, "\x1B[%02omDisable all patches: %s",
+						(foundUnlaunchInstallerVersion == v1_9 && foundUnlaunchInstallerVersion == v2_0) ? 047 : 037,
+						disableAllPatches ? "On" : "Off");
+	sprintf(soundPatchesStr, "\x1B[%02omEnable sound and splash: %s",
+							(foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches) ? 047 : 037,
+							enableSoundAndSplash ? "On" : "Off");
+	sprintf(installStr, "\x1B[%02omInstall unlaunch", (foundUnlaunchInstallerVersion != INVALID && !unlaunchFound) ? 047 : 037);
 	addMenuItem(m, uninstallStr, NULL, 0);
+	addMenuItem(m, tidPatchesStr, NULL, 0);
+	addMenuItem(m, soundPatchesStr, NULL, 0);
 	addMenuItem(m, installStr, NULL, 0);
 	addMenuItem(m, "\x1B[47mExit", NULL, 0);
 
@@ -139,8 +151,8 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	
-	unlaunchInstallerFound = loadUnlaunchInstaller("sd:/unlaunch.dsi");
-	if (!unlaunchInstallerFound)
+	foundUnlaunchInstallerVersion = loadUnlaunchInstaller("sd:/unlaunch.dsi");
+	if (foundUnlaunchInstallerVersion != INVALID)
 	{
 		messageBox("\x1B[41mWARNING:\x1B[47m unlaunch.dsi was not found in\n"
 					"the root of the sd card.\n"
@@ -215,13 +227,26 @@ int main(int argc, char **argv)
 					nandio_lock_writing();
 				}
 				break;
+				
+			case MAIN_MENU_TID_PATCHES:
+				if(foundUnlaunchInstallerVersion == v1_9 && foundUnlaunchInstallerVersion == v2_0) {
+					disableAllPatches = !disableAllPatches;
+					enableSoundAndSplash = true;
+				}
+				break;
+				
+			case MAIN_MENU_SOUND_SPLASH_PATCHES:
+				if(foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches) {
+					enableSoundAndSplash = !enableSoundAndSplash;
+				}
+				break;
 
 			case MAIN_MENU_SAFE_UNLAUNCH_INSTALL:
-				if (unlaunchInstallerFound && (choiceBox("Install unlaunch?") == YES)
+				if (foundUnlaunchInstallerVersion != INVALID && (choiceBox("Install unlaunch?") == YES)
 					&& (retailLauncherTmdPresentAndToBePatched || (choiceBox("There doesn't seem to be a launcher.tmd\nfile matcing the hwinfo file\nKeep installing?") == YES))
 					&& nandio_unlock_writing())
 				{
-					if(installUnlaunch(retailConsole, retailLauncherTmdPresentAndToBePatched ? retailLauncherTmdPath : NULL))
+					if(installUnlaunch(retailConsole, retailLauncherTmdPresentAndToBePatched ? retailLauncherTmdPath : NULL, disableAllPatches, enableSoundAndSplash))
 					{
 						messageBox("Install successful!\n");
 						unlaunchFound = true;

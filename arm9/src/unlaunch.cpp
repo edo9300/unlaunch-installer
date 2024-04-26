@@ -13,13 +13,6 @@ static char unlaunchInstallerBuffer[0x30000];
 static const char* hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd";
 static const char* hnaaBackupTmdPath = "nand:/title/00030017/484e4141/content/title.tmd.bak";
 
-enum UNLAUNCH_VERSION {
-	v1_8,
-	v1_9,
-	v2_0,
-	INVALID,
-};
-
 UNLAUNCH_VERSION installerVersion{INVALID};
 size_t unlaunchInstallerSize{};
 
@@ -39,11 +32,16 @@ constexpr std::array knownUnlaunchHashes{
 	"15f4a36251d1408d71114019b2825fe8f5b4c8cc"_sha1, // v2.0
 };
 
+constexpr std::array blockAllPatchesOffset{
+	0xae74, /* 1.9 */
+	0xae91, /* 2.0 */
+};
+
 static bool writeUnlaunchToHNAAFolder();
 
 bool isValidUnlaunchInstallerSize(size_t size)
 {
-	return size == 163320 /*1.8*/ || size == 196088 /*1.9*/;
+	return size == 163320 /*1.8*/ || size == 196088 /*1.9, 2.0*/;
 }
 
 bool isLauncherTmdPatched(const char* path)
@@ -351,7 +349,7 @@ static bool installUnlaunchProtoConsole(void)
 	return true;
 }
 
-bool readUnlaunchInstaller(const char* path)
+static bool readUnlaunchInstaller(const char* path)
 {
 	FILE* unlaunchInstaller = fopen(path, "rb");
 	if (!unlaunchInstaller)
@@ -361,7 +359,7 @@ bool readUnlaunchInstaller(const char* path)
 	}
 	
 	unlaunchInstallerSize = getFileSize(unlaunchInstaller);
-	if(isValidUnlaunchInstallerSize(unlaunchInstallerSize))
+	if(!isValidUnlaunchInstallerSize(unlaunchInstallerSize))
 	{
 		messageBox("\x1B[31mError:\x1B[33m Unlaunch installer wrong file size\n");
 		return false;
@@ -389,7 +387,7 @@ bool readUnlaunchInstaller(const char* path)
 	return true;
 }
 
-bool verifyUnlaunchInstaller(void)
+static bool verifyUnlaunchInstaller(void)
 {
 	Sha1Digest digest;
 	swiSHA1Calc(digest.data(), unlaunchInstallerBuffer + 520,  unlaunchInstallerSize);
@@ -404,20 +402,39 @@ bool verifyUnlaunchInstaller(void)
 	return true;
 }
 
-bool patchUnlaunchInstaller(void)
+static bool patchUnlaunchInstaller(bool disableAllPatches, bool enableSoundAndSplash)
 {
-	//TODO: Apply patches
+	if(disableAllPatches)
+	{
+		if(installerVersion == v1_8)
+		{
+			messageBox("\x1B[31mError:\x1B[33m Unlaunch 1.8 can't be patched\n");
+			return false;
+		}
+		// change launcher TID from ANH to SAN so that unlaunch doesn't realize it's booting the launcher
+		auto patchOffset = blockAllPatchesOffset[installerVersion - 1];
+		const char newID[]{'S','A','N'};
+		memcpy((unlaunchInstallerBuffer + 520) + patchOffset, newID, 3);
+	}
+	else if (enableSoundAndSplash)
+	{
+		
+	}
 	return true;
 }
 
-bool loadUnlaunchInstaller(const char* path)
+UNLAUNCH_VERSION loadUnlaunchInstaller(const char* path)
 {
-	return readUnlaunchInstaller(path) && verifyUnlaunchInstaller();
+	if(readUnlaunchInstaller(path) && verifyUnlaunchInstaller())
+	{
+		return installerVersion;
+	}
+	return INVALID;
 }
 
-bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath)
+bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, bool disableAllPatches, bool enableSoundAndSplash)
 {
-	if (installerVersion == INVALID || !patchUnlaunchInstaller())
+	if (installerVersion == INVALID || !patchUnlaunchInstaller(disableAllPatches, enableSoundAndSplash))
 		return false;
 
 	// Treat protos differently
