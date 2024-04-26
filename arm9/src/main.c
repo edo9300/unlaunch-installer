@@ -5,6 +5,7 @@
 #include "storage.h"
 #include "version.h"
 #include "unlaunch.h"
+#include "nitrofs.h"
 
 volatile bool programEnd = false;
 static volatile bool arm7Exiting = false;
@@ -139,7 +140,6 @@ int main(int argc, char **argv)
 	if (!fatInitDefault())
 	{
 		messageBox("fatInitDefault()...\x1B[31mFailed\n\x1B[47m");
-		return 0;
 	}
 
 	//setup nand access
@@ -149,12 +149,33 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	
-	foundUnlaunchInstallerVersion = loadUnlaunchInstaller("sd:/unlaunch.dsi");
-	if (foundUnlaunchInstallerVersion != INVALID)
+	const char* installerPath = (argc > 0) ? argv[0] : "sd:/ntrboot.nds";
+	
+	if (!nitroFSInit(installerPath))
 	{
-		messageBox("\x1B[41mWARNING:\x1B[47m unlaunch.dsi was not found in\n"
-					"the root of the sd card.\n"
-					"Installing unlaunch won't be possible.");
+		messageBox("nitroFSInit()...\x1B[31mFailed\n\x1B[47m");
+	}
+	
+	if (fileExists("sd:/unlaunch.dsi"))
+	{
+		foundUnlaunchInstallerVersion = loadUnlaunchInstaller("sd:/unlaunch.dsi");
+		if (foundUnlaunchInstallerVersion == INVALID)
+		{
+			messageBox("\x1B[41mWARNING:\x1B[47m Failed to load unlaunch.dsi\n"
+						"from the root of the sd card.\n"
+						"Attempting to use the bundled one.");
+		}
+	}
+	
+	if(foundUnlaunchInstallerVersion == INVALID)
+	{
+		foundUnlaunchInstallerVersion = loadUnlaunchInstaller("nitro:/unlaunch.dsi");
+		if (foundUnlaunchInstallerVersion == INVALID)
+		{
+			messageBox("\x1B[41mWARNING:\x1B[47m Failed to load bundled unlaunch\n"
+						"installer.\n"
+						"Installing unlaunch won't be possible.");
+		}
 	}
 
 	//check for unlaunch and region

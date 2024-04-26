@@ -8,3 +8,4 @@
 *.vscode
 *.DS_Store
 *._*
+!nitrofiles/*
