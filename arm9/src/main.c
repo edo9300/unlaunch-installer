@@ -16,6 +16,7 @@ static bool retailConsole = true;
 static UNLAUNCH_VERSION foundUnlaunchInstallerVersion = INVALID;
 static bool disableAllPatches = false;
 static bool enableSoundAndSplash = false;
+static const char* splashSoundBinaryPatchPath = NULL;
 bool charging = false;
 u8 batteryLevel = 0;
 
@@ -74,7 +75,7 @@ static int mainMenu(int cursor)
 						(foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) ? 047 : 037,
 						disableAllPatches ? "On" : "Off");
 	sprintf(soundPatchesStr, "\x1B[%02omEnable sound and splash: %s",
-							(foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches) ? 047 : 037,
+							(foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL) ? 047 : 037,
 							enableSoundAndSplash ? "On" : "Off");
 	sprintf(installStr, "\x1B[%02omInstall unlaunch", (foundUnlaunchInstallerVersion != INVALID && !unlaunchFound) ? 047 : 037);
 	addMenuItem(m, uninstallStr, NULL, 0);
@@ -177,6 +178,13 @@ int main(int argc, char **argv)
 						"Installing unlaunch won't be possible.");
 		}
 	}
+	
+	if(fileExists("nitro:/unlaunch-patch.bin"))
+	{
+		splashSoundBinaryPatchPath = "nitro:/unlaunch-patch.bin";
+	} else if (fileExists("sd:/unlaunch-patch.bin")) {
+		splashSoundBinaryPatchPath = "sd:/unlaunch-patch.bin";
+	}
 
 	//check for unlaunch and region
 	u8 region = 0xff;
@@ -257,17 +265,21 @@ int main(int argc, char **argv)
 				break;
 				
 			case MAIN_MENU_SOUND_SPLASH_PATCHES:
-				if(foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches) {
+				if(foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL) {
 					enableSoundAndSplash = !enableSoundAndSplash;
 				}
 				break;
 
 			case MAIN_MENU_SAFE_UNLAUNCH_INSTALL:
-				if (foundUnlaunchInstallerVersion != INVALID && (choiceBox("Install unlaunch?") == YES)
+				if (!unlaunchFound && foundUnlaunchInstallerVersion != INVALID && (choiceBox("Install unlaunch?") == YES)
 					&& (retailLauncherTmdPresentAndToBePatched || (choiceBox("There doesn't seem to be a launcher.tmd\nfile matcing the hwinfo file\nKeep installing?") == YES))
 					&& nandio_unlock_writing())
 				{
-					if(installUnlaunch(retailConsole, retailLauncherTmdPresentAndToBePatched ? retailLauncherTmdPath : NULL, disableAllPatches, enableSoundAndSplash))
+					printf("Installing\n");
+					if(installUnlaunch(retailConsole,
+										retailLauncherTmdPresentAndToBePatched ? retailLauncherTmdPath : NULL,
+										disableAllPatches,
+										enableSoundAndSplash ? splashSoundBinaryPatchPath : NULL))
 					{
 						messageBox("Install successful!\n");
 						unlaunchFound = true;

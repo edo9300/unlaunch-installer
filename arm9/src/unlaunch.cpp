@@ -402,7 +402,7 @@ static bool verifyUnlaunchInstaller(void)
 	return true;
 }
 
-static bool patchUnlaunchInstaller(bool disableAllPatches, bool enableSoundAndSplash)
+static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSoundBinaryPatchPath)
 {
 	if(disableAllPatches)
 	{
@@ -416,9 +416,39 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, bool enableSoundAndSp
 		const char newID[]{'S','A','N'};
 		memcpy((unlaunchInstallerBuffer + 520) + patchOffset, newID, 3);
 	}
-	else if (enableSoundAndSplash)
+	else if (splashSoundBinaryPatchPath)
 	{
-		
+		if(installerVersion != v2_0)
+		{
+			messageBox("\x1B[31mError:\x1B[33m The splash and sound patch is\n"
+						"only for unlaunch 2.0\n");
+			return false;
+		}
+		static constexpr auto patchOffset = 0x8580;
+		static constexpr auto patchSectionSize = 0x67FD;
+		auto* patch = fopen(splashSoundBinaryPatchPath, "rb");
+		if(!patch)
+		{
+			messageBox("\x1B[31mError:\x1B[33m Failed to open the splash and\n"
+						"sound patch is.\n");
+			return false;
+		}
+		auto patchSize = getFileSize(patch);
+		if(patchSize > patchSectionSize)
+		{
+			messageBox("\x1B[31mError:\x1B[33m Splash and sound patch is too\n"
+						"big.\n");
+			fclose(patch);
+			return false;
+		}
+		if (fread((unlaunchInstallerBuffer + 520) + patchOffset, 1, patchSize, patch) != patchSize)
+		{
+			messageBox("\x1B[31mError:\x1B[33m Failed to read splash and sound\n"
+						"patch.\n");
+			fclose(patch);
+			return false;
+		}
+		fclose(patch);
 	}
 	return true;
 }
@@ -432,9 +462,9 @@ UNLAUNCH_VERSION loadUnlaunchInstaller(const char* path)
 	return INVALID;
 }
 
-bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, bool disableAllPatches, bool enableSoundAndSplash)
+bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, bool disableAllPatches, const char* splashSoundBinaryPatchPath)
 {
-	if (installerVersion == INVALID || !patchUnlaunchInstaller(disableAllPatches, enableSoundAndSplash))
+	if (installerVersion == INVALID || !patchUnlaunchInstaller(disableAllPatches, splashSoundBinaryPatchPath))
 		return false;
 
 	// Treat protos differently
