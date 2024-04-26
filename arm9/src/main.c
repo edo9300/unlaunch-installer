@@ -12,7 +12,7 @@ static bool unlaunchFound = false;
 static bool hnaaUnlaunchFound = false;
 static bool retailLauncherTmdPresentAndToBePatched = true;
 static bool retailConsole = true;
-static UNLAUNCH_VERSION foundUnlaunchInstallerVersion = false;
+static UNLAUNCH_VERSION foundUnlaunchInstallerVersion = INVALID;
 static bool disableAllPatches = false;
 static bool enableSoundAndSplash = false;
 bool charging = false;
@@ -53,7 +53,7 @@ static int mainMenu(int cursor)
 	//top screen
 	clearScreen(&topScreen);
 
-	iprintf("\t\t\"Safe\" unlaunch installer\n");
+	iprintf("\t\"Safe\" unlaunch installer\n");
 	iprintf("\nversion %s\n", VERSION);
 	iprintf("\n\n\x1B[41mWARNING:\x1B[47m This tool can write to"
 			"\nyour internal NAND!"
@@ -61,8 +61,6 @@ static int mainMenu(int cursor)
 			"\nlow, of \x1B[41mbricking\x1B[47m your system"
 			"\nand should be done with caution!\n");
 	iprintf("\n\t  \x1B[46mhttps://dsi.cfw.guide\x1B[47m\n");
-	iprintf("\x1b[21;0HJeff - 2018-2019");
-	iprintf("\x1b[22;0HPk11 - 2022-2023");
 	iprintf("\x1b[23;0Hedo9300 - 2024");
 
 	//menu
@@ -72,7 +70,7 @@ static int mainMenu(int cursor)
 	char uninstallStr[32], installStr[32], soundPatchesStr[64], tidPatchesStr[32];
 	sprintf(uninstallStr, "\x1B[%02omUninstall unlaunch", unlaunchFound ? 047 : 037);
 	sprintf(tidPatchesStr, "\x1B[%02omDisable all patches: %s",
-						(foundUnlaunchInstallerVersion == v1_9 && foundUnlaunchInstallerVersion == v2_0) ? 047 : 037,
+						(foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) ? 047 : 037,
 						disableAllPatches ? "On" : "Off");
 	sprintf(soundPatchesStr, "\x1B[%02omEnable sound and splash: %s",
 							(foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches) ? 047 : 037,
@@ -200,7 +198,7 @@ int main(int argc, char **argv)
 		unsigned long long tmdSize = getFileSizePath(hnaaTmdPath);
 		if (tmdSize > 520)
 		{
-			unlaunchFound = (mainTmdIsPatched || !retailConsole);
+			unlaunchFound = unlaunchFound || (mainTmdIsPatched || !retailConsole);
 			hnaaUnlaunchFound = true;
 		}
 	}
@@ -229,7 +227,7 @@ int main(int argc, char **argv)
 				break;
 				
 			case MAIN_MENU_TID_PATCHES:
-				if(foundUnlaunchInstallerVersion == v1_9 && foundUnlaunchInstallerVersion == v2_0) {
+				if(foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) {
 					disableAllPatches = !disableAllPatches;
 					enableSoundAndSplash = true;
 				}
