@@ -12,11 +12,11 @@
 
 /************************ Function Protoypes **********************************/
 
-bool nandio_startup();
-bool nandio_is_inserted();
-bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer);
-bool nandio_write_sectors(sec_t offset, sec_t len, const void *buffer);
-bool nandio_clear_status();
+static bool nandio_startup();
+static bool nandio_is_inserted();
+static bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer);
+static bool nandio_write_sectors(sec_t offset, sec_t len, const void *buffer);
+static bool nandio_clear_status();
 bool nandio_shutdown();
 
 /************************ Constants / Defines *********************************/
@@ -51,7 +51,7 @@ void nandio_set_fat_sig_fix(u32 offset)
 	fat_sig_fix_offset = offset;
 }
 
-void getConsoleID(u8 *consoleID)
+static void getConsoleID(u8 *consoleID)
 {
 	u8 *fifo=(u8*)0x02300000; //shared mem address that has our computed key3 stuff
 	u8 key[16]; //key3 normalkey - keyslot 3 is used for DSi/twln NAND crypto
@@ -76,7 +76,7 @@ void getConsoleID(u8 *consoleID)
 	memcpy(&consoleID[4], &key_x[0xC], 4);
 }
 
-bool nandio_startup()
+static bool nandio_startup()
 {
 	if (!nand_Startup())
 	{
@@ -115,7 +115,7 @@ bool nandio_startup()
 	return crypt_buf != 0;
 }
 
-bool nandio_is_inserted()
+static bool nandio_is_inserted()
 {
 	return true;
 }
@@ -162,7 +162,7 @@ static bool write_sectors(sec_t start, sec_t len, const void *buffer)
 }
 
 
-bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer)
+static bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer)
 {
 	while (len >= CRYPT_BUF_LEN)
 	{
@@ -183,7 +183,7 @@ bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer)
 	}
 }
 
-bool nandio_write_sectors(sec_t offset, sec_t len, const void *buffer)
+static bool nandio_write_sectors(sec_t offset, sec_t len, const void *buffer)
 {
 	if (writingLocked)
 		return false;
@@ -209,47 +209,14 @@ bool nandio_write_sectors(sec_t offset, sec_t len, const void *buffer)
 	}
 }
 
-bool nandio_clear_status()
+static bool nandio_clear_status()
 {
 	return true;
 }
 
 bool nandio_shutdown()
 {
-	if (nandWritten)
-	{
-		// at cleanup we synchronize the FAT statgings
-		// A FatFS might have multiple copies of the FAT.
-		// we will get them back synchonized as we just worked on the first copy
-		// this allows us to revert changes in the FAT if we did not properly finish
-		// and did not push the changes to the other copies
-		// to do this we read the first partition sector
-		nandio_read_sectors(fat_sig_fix_offset, 1, sector_buf);
-		u8 stagingLevels = sector_buf[0x10];
-		u8 reservedSectors = sector_buf[0x0E];
-		u16 sectorsPerFatCopy = sector_buf[0x16] | ((u16)sector_buf[0x17] << 8);
-	/*
-		iprintf("[i] Staging for %i FAT copies\n",stagingLevels);
-		iprintf("[i] Stages starting at %i\n",reservedSectors);
-		iprintf("[i] %i sectors per stage\n",sectorsPerFatCopy);
-	*/
-		if (stagingLevels > 1)
-		{
-			for (u32 sector = 0;sector < sectorsPerFatCopy; sector++)
-			{
-				// read fat sector
-				nandio_read_sectors(fat_sig_fix_offset + reservedSectors + sector, 1, sector_buf);
-				// write to each copy, except the source copy
-				writingLocked = false;
-				for (int stage = 1;stage < stagingLevels;stage++)
-				{
-					nandio_write_sectors(fat_sig_fix_offset + reservedSectors + sector + (stage *sectorsPerFatCopy), 1, sector_buf);
-				}
-				writingLocked = true;
-			}
-		}
-		nandWritten = false;
-	}
+	nandio_synchronize_fats();
 	free(crypt_buf);
 	crypt_buf = 0;
 	return true;
@@ -275,4 +242,40 @@ bool nandio_force_fat_fix()
 		nandWritten = true;
 
 	return true;
+}
+
+void nandio_synchronize_fats()
+{
+	if (!nandWritten) return;
+	// at cleanup we synchronize the FAT statgings
+	// A FatFS might have multiple copies of the FAT.
+	// we will get them back synchonized as we just worked on the first copy
+	// this allows us to revert changes in the FAT if we did not properly finish
+	// and did not push the changes to the other copies
+	// to do this we read the first partition sector
+	nandio_read_sectors(fat_sig_fix_offset, 1, sector_buf);
+	u8 stagingLevels = sector_buf[0x10];
+	u8 reservedSectors = sector_buf[0x0E];
+	u16 sectorsPerFatCopy = sector_buf[0x16] | ((u16)sector_buf[0x17] << 8);
+/*
+	iprintf("[i] Staging for %i FAT copies\n",stagingLevels);
+	iprintf("[i] Stages starting at %i\n",reservedSectors);
+	iprintf("[i] %i sectors per stage\n",sectorsPerFatCopy);
+*/
+	if (stagingLevels > 1)
+	{
+		for (u32 sector = 0;sector < sectorsPerFatCopy; sector++)
+		{
+			// read fat sector
+			nandio_read_sectors(fat_sig_fix_offset + reservedSectors + sector, 1, sector_buf);
+			// write to each copy, except the source copy
+			writingLocked = false;
+			for (int stage = 1;stage < stagingLevels;stage++)
+			{
+				nandio_write_sectors(fat_sig_fix_offset + reservedSectors + sector + (stage *sectorsPerFatCopy), 1, sector_buf);
+			}
+			writingLocked = true;
+		}
+	}
+	nandWritten = false;
 }

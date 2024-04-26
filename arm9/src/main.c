@@ -223,6 +223,8 @@ int main(int argc, char **argv)
 						messageBox("\x1B[31mError:\x1B[33m Uninstall failed\n");
 					}
 					nandio_lock_writing();
+					printf("Synchronizing FAT tables...\n");
+					nandio_synchronize_fats();
 				}
 				break;
 				
@@ -252,6 +254,8 @@ int main(int argc, char **argv)
 						messageBox("\x1B[31mError:\x1B[33m Install failed\n");
 					}
 					nandio_lock_writing();
+					printf("Synchronizing FAT tables...\n");
+					nandio_synchronize_fats();
 				}
 				break;
 

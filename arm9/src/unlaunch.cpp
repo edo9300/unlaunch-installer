@@ -354,7 +354,7 @@ static bool readUnlaunchInstaller(const char* path)
 	FILE* unlaunchInstaller = fopen(path, "rb");
 	if (!unlaunchInstaller)
 	{
-		messageBox("\x1B[31mError:\x1B[33m Failed to open unlaunch installer\n(sd:/unlaunch.dsi)\n");
+		messageBox("\x1B[31mError:\x1B[33m Failed to open unlaunch installer\n");
 		return false;
 	}
 	
