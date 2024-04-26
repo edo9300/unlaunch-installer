@@ -30,7 +30,7 @@ void freeMenu(Menu* m);
 
 void addMenuItem(Menu* m, char const* label, char const* value, bool directory);
 void sortMenuItems(Menu* m);
-void setMenuHeader(Menu* m, char* str);
+void setMenuHeader(Menu* m, const char* str);
 
 void resetMenu(Menu* m);
 void clearMenu(Menu* m);

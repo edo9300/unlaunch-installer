@@ -1,3 +1,4 @@
+#include "bgMenu.h"
 #include "main.h"
 #include "menu.h"
 #include "message.h"
@@ -17,6 +18,7 @@ static UNLAUNCH_VERSION foundUnlaunchInstallerVersion = INVALID;
 static bool disableAllPatches = false;
 static bool enableSoundAndSplash = false;
 static const char* splashSoundBinaryPatchPath = NULL;
+static const char* customBgPath = NULL;
 bool charging = false;
 u8 batteryLevel = 0;
 
@@ -25,6 +27,7 @@ PrintConsole bottomScreen;
 
 enum {
 	MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL,
+	MAIN_MENU_CUSTOM_BG,
 	MAIN_MENU_TID_PATCHES,
 	MAIN_MENU_SOUND_SPLASH_PATCHES,
 	MAIN_MENU_SAFE_UNLAUNCH_INSTALL,
@@ -69,8 +72,9 @@ static int mainMenu(int cursor)
 	Menu* m = newMenu();
 	setMenuHeader(m, "MAIN MENU");
 
-	char uninstallStr[32], installStr[32], soundPatchesStr[64], tidPatchesStr[32];
+	char uninstallStr[32], installStr[32], soundPatchesStr[64], tidPatchesStr[32], customBgStr[32];
 	sprintf(uninstallStr, "\x1B[%02omUninstall unlaunch", unlaunchFound ? 047 : 037);
+	sprintf(customBgStr, "\x1B[%02omCustom background", (foundUnlaunchInstallerVersion != INVALID) ? 047 : 037);
 	sprintf(tidPatchesStr, "\x1B[%02omDisable all patches: %s",
 						(foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) ? 047 : 037,
 						disableAllPatches ? "On" : "Off");
@@ -79,6 +83,7 @@ static int mainMenu(int cursor)
 							enableSoundAndSplash ? "On" : "Off");
 	sprintf(installStr, "\x1B[%02omInstall unlaunch", (foundUnlaunchInstallerVersion != INVALID && !unlaunchFound) ? 047 : 037);
 	addMenuItem(m, uninstallStr, NULL, 0);
+	addMenuItem(m, customBgStr, NULL, true);
 	addMenuItem(m, tidPatchesStr, NULL, 0);
 	addMenuItem(m, soundPatchesStr, NULL, 0);
 	addMenuItem(m, installStr, NULL, 0);
@@ -257,6 +262,22 @@ int main(int argc, char **argv)
 				}
 				break;
 				
+			case MAIN_MENU_CUSTOM_BG:
+				if(foundUnlaunchInstallerVersion != INVALID) {
+					const char* customBg = backgroundMenu();
+					if(!customBg)
+						break;
+					if(strcmp(customBg, "default") == 0)
+					{
+						customBgPath = NULL;
+					}
+					else
+					{
+						customBgPath = customBg;
+					}
+				}
+				break;
+			
 			case MAIN_MENU_TID_PATCHES:
 				if(foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) {
 					disableAllPatches = !disableAllPatches;
@@ -279,7 +300,8 @@ int main(int argc, char **argv)
 					if(installUnlaunch(retailConsole,
 										retailLauncherTmdPresentAndToBePatched ? retailLauncherTmdPath : NULL,
 										disableAllPatches,
-										enableSoundAndSplash ? splashSoundBinaryPatchPath : NULL))
+										enableSoundAndSplash ? splashSoundBinaryPatchPath : NULL,
+										customBgPath))
 					{
 						messageBox("Install successful!\n");
 						unlaunchFound = true;

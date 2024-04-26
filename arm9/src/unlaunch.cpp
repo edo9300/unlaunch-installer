@@ -1,15 +1,16 @@
 #include "message.h"
 #include "sha1digest.h"
 #include "storage.h"
+#include "tonccpy.h"
 #include "unlaunch.h"
 #include <algorithm>
-#include <array>
 #include <nds/sha1.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
 
 static char unlaunchInstallerBuffer[0x30000];
+static char ogUnlaunchInstallerBuffer[0x30000];
 static const char* hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd";
 static const char* hnaaBackupTmdPath = "nand:/title/00030017/484e4141/content/title.tmd.bak";
 
@@ -30,6 +31,12 @@ constexpr std::array knownUnlaunchHashes{
 	"b76c2b1722e769c6c0b4b3d4bc73250e41993229"_sha1, // v1.8
 	"f3eb41cba136a3477523155f8b05df14917c55f4"_sha1, // v1.9
 	"15f4a36251d1408d71114019b2825fe8f5b4c8cc"_sha1, // v2.0
+};
+
+constexpr std::array gifOffsets{
+	std::make_pair(0x48d4, 0x8540), /* 1.8 */
+	std::make_pair(0x48c8, 0x8534), /* 1.9 */
+	std::make_pair(0x48f0, 0x855c), /* 2.0 */
 };
 
 constexpr std::array blockAllPatchesOffset{
@@ -366,12 +373,12 @@ static bool readUnlaunchInstaller(const char* path)
 	}
 
 	int toRead = unlaunchInstallerSize;
-	char* buff = unlaunchInstallerBuffer;
+	auto* buff = unlaunchInstallerBuffer;
 	// Pad the installer with 520 bytes, those being the size of a valid tmd
 	buff += 520;
 
 	size_t n = 0;
-	while (toRead != 0 && (n = fread(buff, sizeof(char), toRead, unlaunchInstaller)) > 0)
+	while (toRead != 0 && (n = fread(buff, sizeof(uint8_t), toRead, unlaunchInstaller)) > 0)
 	{
 		toRead -= n;
 		buff += n;
@@ -402,8 +409,64 @@ static bool verifyUnlaunchInstaller(void)
 	return true;
 }
 
-static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSoundBinaryPatchPath)
+static bool patchCustomBackground(const char* customBackgroundPath)
 {
+	if(!customBackgroundPath)
+	{
+		return true;
+	}
+	auto bgGif = fopen(customBackgroundPath, "rb");
+	if(!bgGif)
+	{
+		messageBox("\x1B[31mError:\x1B[33m Failed to open custom bg gif.\n");
+		return false;
+	}
+	auto size = getFileSize(bgGif);
+	if(size < 7 || size > 0x3C70)
+	{
+		messageBox("\x1B[31mError:\x1B[33m Invalid gif file.\n");
+		fclose(bgGif);
+		return false;
+	}
+	u16 gifWidth;
+	u16 gifHeight;
+	if((fseek(bgGif, 6, SEEK_SET) != 0) || (fread(&gifWidth, 1, sizeof(u16), bgGif) != sizeof(u16)) || (fread(&gifHeight, 1, sizeof(u16), bgGif) != sizeof(u16)))
+	{
+		messageBox("\x1B[31mError:\x1B[33m Failed to parse gif file.\n");
+		fclose(bgGif);
+		return false;
+	}
+	if (gifWidth != 256 || gifHeight != 192) {
+		messageBox("\x1B[31mError:\x1B[33m Gif file has invalid dimensions.\n");
+		fclose(bgGif);
+		return false;
+	}
+	const u32 gifSignatureStart = 0x38464947;
+	const u32 gifSignatureEnd = 0x3B000044;
+	
+	auto [gifOffsetStart, gifOffsetEnd] = gifOffsets[installerVersion];
+	
+	auto* gifStart = reinterpret_cast<uint32_t*>((unlaunchInstallerBuffer + 520) + gifOffsetStart);
+	auto* gifEnd = reinterpret_cast<uint32_t*>((unlaunchInstallerBuffer + 520) + gifOffsetEnd);
+	
+	if(*gifStart != gifSignatureStart || *gifEnd != gifSignatureEnd)
+	{
+		messageBox("\x1B[31mError:\x1B[33m Gif offsets not matching.\n");
+		fclose(bgGif);
+		return false;
+	}
+	
+	fseek(bgGif, 0, SEEK_SET);
+	
+	//read the whole file, could be less than 0x3C70, but unlaunch should then just ignore the leftover data
+	fread(gifStart, 1, 0x3C70, bgGif);
+	
+	return true;
+}
+
+static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath)
+{
+	tonccpy(unlaunchInstallerBuffer, ogUnlaunchInstallerBuffer, sizeof(unlaunchInstallerBuffer));
 	if(disableAllPatches)
 	{
 		if(installerVersion == v1_8)
@@ -450,6 +513,10 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSou
 		}
 		fclose(patch);
 	}
+	if(!patchCustomBackground(customBackgroundPath))
+	{
+		return false;
+	}
 	return true;
 }
 
@@ -457,14 +524,15 @@ UNLAUNCH_VERSION loadUnlaunchInstaller(const char* path)
 {
 	if(readUnlaunchInstaller(path) && verifyUnlaunchInstaller())
 	{
+		tonccpy(ogUnlaunchInstallerBuffer, unlaunchInstallerBuffer, sizeof(unlaunchInstallerBuffer));
 		return installerVersion;
 	}
 	return INVALID;
 }
 
-bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, bool disableAllPatches, const char* splashSoundBinaryPatchPath)
+bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath)
 {
-	if (installerVersion == INVALID || !patchUnlaunchInstaller(disableAllPatches, splashSoundBinaryPatchPath))
+	if (installerVersion == INVALID || !patchUnlaunchInstaller(disableAllPatches, splashSoundBinaryPatchPath, customBackgroundPath))
 		return false;
 
 	// Treat protos differently

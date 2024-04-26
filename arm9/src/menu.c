@@ -77,7 +77,7 @@ void sortMenuItems(Menu* m)
 	qsort(m->items, m->itemCount, sizeof(Item), alphabeticalCompare);
 }
 
-void setMenuHeader(Menu* m, char* str)
+void setMenuHeader(Menu* m, const char* str)
 {
 	if (!m) return;
 
@@ -87,7 +87,7 @@ void setMenuHeader(Menu* m, char* str)
 		return;
 	}
 
-	char* strPtr = str;
+	const char* strPtr = str;
 
 	if (strlen(strPtr) > 30)
 		strPtr = str + (strlen(strPtr) - 30);
