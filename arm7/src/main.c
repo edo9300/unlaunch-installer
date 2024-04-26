@@ -29,6 +29,7 @@
 ---------------------------------------------------------------------------------*/
 #include "my_sdmmc.h"
 
+#include "deviceList.h"
 #include <nds.h>
 #include <string.h>
 
@@ -96,10 +97,13 @@ void aes(void* in, void* out, void* iv, u32 method)
 
 int my_sdmmc_nand_startup();
 
+#define DEVICE_LIST_SENTINEL *(vu32*)0x02300020
+
 //---------------------------------------------------------------------------------
 int main()
 //---------------------------------------------------------------------------------
 {
+	DEVICE_LIST_SENTINEL = 0;
 	// clear sound registers
 	dmaFillWords(0, (void*)0x04000400, 0x100);
 
@@ -119,6 +123,12 @@ int main()
 
 	if (isDSiMode() /*|| ((REG_SCFG_EXT & BIT(17)) && (REG_SCFG_EXT & BIT(18)))*/)
 	{
+		if(__DeviceList)
+			memmove((vu8*)0x02300024, __DeviceList, sizeof(DeviceList));
+		else
+			memset((vu8*)0x02300024, 0, sizeof(DeviceList));
+		DEVICE_LIST_SENTINEL = 1;
+		
 		vu8 *out=(vu8*)0x02300000;
 		memset(out, 0, 16);
 

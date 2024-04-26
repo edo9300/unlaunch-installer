@@ -7,6 +7,7 @@
 #include "version.h"
 #include "unlaunch.h"
 #include "nitrofs.h"
+#include "deviceList.h"
 
 volatile bool programEnd = false;
 static volatile bool arm7Exiting = false;
@@ -155,7 +156,9 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	
-	const char* installerPath = (argc > 0) ? argv[0] : "sd:/ntrboot.nds";
+	DeviceList* deviceList = getDeviceList();
+	
+	const char* installerPath = (argc > 0) ? argv[0] : (deviceList ? deviceList->appname :  "sd:/ntrboot.nds");
 	
 	if (!nitroFSInit(installerPath))
 	{
