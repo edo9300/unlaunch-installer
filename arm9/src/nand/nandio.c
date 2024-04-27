@@ -10,6 +10,8 @@
 #include "nandio.h"
 #include "u128_math.h"
 
+#define NOCASH_FOOTER_SECTOR 2044
+
 /************************ Function Protoypes **********************************/
 
 static bool nandio_startup();
@@ -51,7 +53,16 @@ void nandio_set_fat_sig_fix(u32 offset)
 	fat_sig_fix_offset = offset;
 }
 
-static void getConsoleID(u8 *consoleID)
+void getCID(u8 *CID)
+{
+	vu8* CIDbuff = (vu8*)0x2FFD7BC;
+	for(int i = 0; i < 16; ++i)
+	{
+		CID[i] = CIDbuff[i];
+	}
+}
+
+void getConsoleID(u8 *consoleID)
 {
 	vu8 *fifo=(vu8*)0x02300000; //shared mem address that has our computed key3 stuff
 	u8 key[16]; //key3 normalkey - keyslot 3 is used for DSi/twln NAND crypto
@@ -89,6 +100,7 @@ static bool nandio_startup()
 
 	u8 consoleID[8];
 	u8 consoleIDfixed[8];
+	u8 CID[16];
 
 	// Get ConsoleID
 	getConsoleID(consoleID);
@@ -97,8 +109,10 @@ static bool nandio_startup()
 		consoleIDfixed[i] = consoleID[7-i];
 	}
 	
+	getCID(CID);
+	
 	// iprintf("sector 0 is %s\n", is3DS ? "3DS" : "DSi");
-	dsi_crypt_init((const u8*)consoleIDfixed, (const u8*)0x2FFD7BC, is3DS);
+	dsi_crypt_init((const u8*)consoleIDfixed, (const u8*)CID, is3DS);
 	dsi_nand_crypt(sector_buf, sector_buf, 0, SECTOR_SIZE / AES_BLOCK_SIZE);
 
 	parse_mbr(sector_buf, is3DS);
@@ -142,6 +156,49 @@ static bool read_sectors(sec_t start, sec_t len, void *buffer)
 	{
 		return false;
 	}
+}
+
+void nandio_construct_nocash_footer(NocashFooter* footer)
+{	
+	u8 CID[16];
+	u8 consoleID[8];
+	
+	getCID(CID);
+	getConsoleID(consoleID);
+	
+	constructNocashFooter(footer, CID, consoleID);
+}
+
+bool nandio_read_nocash_footer(NocashFooter* footer)
+{
+	if(!nand_ReadSectors(NOCASH_FOOTER_SECTOR, 1, crypt_buf))
+	{
+		return false;
+	}
+	
+	memcpy(footer, crypt_buf, sizeof(NocashFooter));
+	return true;
+}
+
+bool nandio_write_nocash_footer(NocashFooter* footer)
+{
+	if (writingLocked)
+		return false;
+	
+	if(!nand_ReadSectors(NOCASH_FOOTER_SECTOR, 1, crypt_buf))
+	{
+		return false;
+	}
+	
+	memcpy(crypt_buf, footer, sizeof(NocashFooter));
+	
+	
+	if(!nand_WriteSectors(NOCASH_FOOTER_SECTOR, 1, crypt_buf))
+	{
+		return false;
+	}
+	
+	return true;
 }
 
 // len is guaranteed <= CRYPT_BUF_LEN

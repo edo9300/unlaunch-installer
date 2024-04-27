@@ -8,6 +8,7 @@
 #include "unlaunch.h"
 #include "nitrofs.h"
 #include "deviceList.h"
+#include "nocashFooter.h"
 
 volatile bool programEnd = false;
 static volatile bool arm7Exiting = false;
@@ -22,7 +23,9 @@ static const char* splashSoundBinaryPatchPath = NULL;
 static const char* customBgPath = NULL;
 volatile bool charging = false;
 volatile u8 batteryLevel = 0;
-static bool wantsUnsafeUnlaunchUninstall = false;
+static bool advancedOptionsUnlocked = false;
+static bool needsNocashFooterToBeWritten = false;
+static NocashFooter computedNocashFooter;
 
 PrintConsole topScreen;
 PrintConsole bottomScreen;
@@ -35,6 +38,7 @@ enum {
 	MAIN_MENU_SAFE_UNLAUNCH_INSTALL,
 	MAIN_MENU_EXIT,
 	MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP,
+	MAIN_MENU_WRITE_NOCASH_FOOTER_ONLY,
 };
 
 static void setupScreens()
@@ -94,8 +98,11 @@ static int mainMenu(int cursor)
 	addMenuItem(m, soundPatchesStr, NULL, foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL, false);
 	addMenuItem(m, installUnlaunchStr, NULL, foundUnlaunchInstallerVersion != INVALID && !unlaunchFound, false);
 	addMenuItem(m, "Exit", NULL, true, false);
-	if(wantsUnsafeUnlaunchUninstall)
+	if(advancedOptionsUnlocked)
+	{
 		addMenuItem(m, "Uninstall unlaunch no backup", NULL, unlaunchFound, false);
+		addMenuItem(m, "Write nocash footer", NULL, needsNocashFooterToBeWritten, false);
+	}
 
 	m->cursor = cursor;
 
@@ -116,7 +123,7 @@ static int mainMenu(int cursor)
 		if (keysDown() & KEY_A)
 			break;
 
-		if(wantsUnsafeUnlaunchUninstall)
+		if(advancedOptionsUnlocked)
 			continue;
 
 		int held = keysHeld();
@@ -135,8 +142,9 @@ static int mainMenu(int cursor)
 		}
 		if (konamiCode == 5)
 		{
-			wantsUnsafeUnlaunchUninstall = true;
+			advancedOptionsUnlocked = true;
 			addMenuItem(m, "Uninstall unlaunch no backup", NULL, unlaunchFound, false);
+			addMenuItem(m, "Write nocash footer", NULL, needsNocashFooterToBeWritten, false);
 		}
 	}
 
@@ -188,7 +196,26 @@ int main(int argc, char **argv)
 		messageBox("nand init \x1B[31mfailed\n\x1B[47m");
 		return 0;
 	}
-
+	
+	NocashFooter footer;
+	
+	nandio_read_nocash_footer(&footer);
+	nandio_construct_nocash_footer(&computedNocashFooter);
+	
+	if(!(needsNocashFooterToBeWritten = !isFooterValid(&footer)))
+	{
+		if(memcmp(&footer, &computedNocashFooter, sizeof(footer)) != 0)
+		{
+			messageBox("\x1B[31mError:\x1B[33m This console has a\n"
+						"nocash footer embedded in its\n"
+						"nand that doesn't match the one\n"
+						"generated.\n"
+						"The footer already present will\n"
+						"be overwritten.");
+			needsNocashFooterToBeWritten = true;
+		}
+	}
+	
 	while (batteryLevel < 7 && !charging)
 	{
 		if (choiceBox("\x1B[47mBattery is too low!\nPlease plug in the console.\n\nContinue?") == NO)
@@ -292,7 +319,18 @@ int main(int argc, char **argv)
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL:
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP:
 				if(unlaunchFound && nandio_unlock_writing()) {
-					bool unsafeUninstall = wantsUnsafeUnlaunchUninstall && cursor == MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP;
+					bool unsafeUninstall = advancedOptionsUnlocked && cursor == MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP;
+					printf("Uninstalling");
+					if(needsNocashFooterToBeWritten)
+					{
+						printf("Writing nocash footer\n");
+						if(!nandio_write_nocash_footer(&computedNocashFooter))
+						{
+							messageBox("Failed to write nocash footer");
+							break;
+						}
+						needsNocashFooterToBeWritten = false;
+					}
 					if(uninstallUnlaunch(retailConsole, hnaaUnlaunchFound, retailLauncherTmdPath, unsafeUninstall))
 					{
 						messageBox("Uninstall successful!\n");
@@ -340,6 +378,16 @@ int main(int argc, char **argv)
 					&& nandio_unlock_writing())
 				{
 					printf("Installing\n");
+					if(needsNocashFooterToBeWritten)
+					{
+						printf("Writing nocash footer\n");
+						if(!nandio_write_nocash_footer(&computedNocashFooter))
+						{
+							messageBox("Failed to write nocash footer");
+							break;
+						}
+						needsNocashFooterToBeWritten = false;
+					}
 					if(installUnlaunch(retailConsole,
 										retailLauncherTmdPresentAndToBePatched ? retailLauncherTmdPath : NULL,
 										disableAllPatches,
@@ -354,6 +402,18 @@ int main(int argc, char **argv)
 					nandio_lock_writing();
 					printf("Synchronizing FAT tables...\n");
 					nandio_synchronize_fats();
+				}
+				break;
+				
+			case MAIN_MENU_WRITE_NOCASH_FOOTER_ONLY:
+				if(needsNocashFooterToBeWritten)
+				{
+					if(!nandio_write_nocash_footer(&computedNocashFooter))
+					{
+						messageBox("Failed to write nocash footer");
+						break;
+					}
+					needsNocashFooterToBeWritten = false;
 				}
 				break;
 
