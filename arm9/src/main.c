@@ -73,16 +73,24 @@ static int mainMenu(int cursor)
 	Menu* m = newMenu();
 	setMenuHeader(m, "MAIN MENU");
 
-	char soundPatchesStr[64], tidPatchesStr[32];
+	char soundPatchesStr[64], tidPatchesStr[32], installUnlaunchStr[32];
 	sprintf(tidPatchesStr, "Disable all patches: %s",
 						disableAllPatches ? "On" : "Off");
 	sprintf(soundPatchesStr, "Enable sound and splash: %s",
 							enableSoundAndSplash ? "On" : "Off");
+	if(foundUnlaunchInstallerVersion != INVALID)
+	{
+		sprintf(installUnlaunchStr, "Install unlaunch (%s)", getUnlaunchVersionString(foundUnlaunchInstallerVersion));
+	}
+	else
+	{
+		strcpy(installUnlaunchStr, "Install unlaunch");
+	}
 	addMenuItem(m, "Uninstall unlaunch", NULL, unlaunchFound, false);
 	addMenuItem(m, "Custom background", NULL, foundUnlaunchInstallerVersion != INVALID, true);
 	addMenuItem(m, tidPatchesStr, NULL, foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0, false);
 	addMenuItem(m, soundPatchesStr, NULL, foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL, false);
-	addMenuItem(m, "Install unlaunch", NULL, foundUnlaunchInstallerVersion != INVALID && !unlaunchFound, false);
+	addMenuItem(m, installUnlaunchStr, NULL, foundUnlaunchInstallerVersion != INVALID && !unlaunchFound, false);
 	addMenuItem(m, "Exit", NULL, true, false);
 
 	m->cursor = cursor;

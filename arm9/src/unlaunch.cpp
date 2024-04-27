@@ -530,6 +530,20 @@ UNLAUNCH_VERSION loadUnlaunchInstaller(const char* path)
 	return INVALID;
 }
 
+std::array unlaunchVersionStrings{
+	"v1.8",
+	"v1.9",
+	"v2.0",
+	"INVALID",
+};
+
+static_assert(unlaunchVersionStrings.size() == (INVALID + 1));
+
+const char* getUnlaunchVersionString(UNLAUNCH_VERSION version)
+{
+	return unlaunchVersionStrings[version];
+}
+
 bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath)
 {
 	if (installerVersion == INVALID || !patchUnlaunchInstaller(disableAllPatches, splashSoundBinaryPatchPath, customBackgroundPath))
