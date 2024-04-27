@@ -182,6 +182,7 @@ int main()
 	irqEnable( IRQ_VBLANK | IRQ_VCOUNT | IRQ_NETWORK);
 
 	// Keep the ARM7 mostly idle
+	int oldBatteryStatus = 0;
 	while (!exitflag)
 	{
 		if ( 0 == (REG_KEYINPUT & (KEY_SELECT | KEY_START | KEY_L | KEY_R)))
@@ -189,12 +190,11 @@ int main()
 			exitflag = true;
 		}
 
-		int batteryStatus;
-		if (isDSiMode() || REG_SCFG_EXT != 0)
-			batteryStatus = i2cReadRegister(I2C_PM, I2CREGPM_BATTERY);
-		else
-			batteryStatus = (readPowerManagement(PM_BATTERY_REG) & 1) ? 0x3 : 0xF;
-		fifoSendValue32(FIFO_USER_03, batteryStatus);
+		int batteryStatus = i2cReadRegister(I2C_PM, I2CREGPM_BATTERY);
+		if(oldBatteryStatus != batteryStatus)
+		{
+			fifoSendValue32(FIFO_USER_03, oldBatteryStatus = batteryStatus);
+		}
 
 		swiWaitForVBlank();
 	}

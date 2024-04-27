@@ -20,8 +20,8 @@ static bool disableAllPatches = false;
 static bool enableSoundAndSplash = false;
 static const char* splashSoundBinaryPatchPath = NULL;
 static const char* customBgPath = NULL;
-bool charging = false;
-u8 batteryLevel = 0;
+volatile bool charging = false;
+volatile u8 batteryLevel = 0;
 
 PrintConsole topScreen;
 PrintConsole bottomScreen;
@@ -139,7 +139,7 @@ int main(int argc, char **argv)
 	//DSi check
 	if (!isDSiMode())
 	{
-		messageBox("\x1B[31mError:\x1B[33m This app is only for DSi.");
+		messageBox("\x1B[31mError:\x1B[33m This app is exclusively for DSi.");
 		return 0;
 	}
 
@@ -154,6 +154,12 @@ int main(int argc, char **argv)
 	{
 		messageBox("nand init \x1B[31mfailed\n\x1B[47m");
 		return 0;
+	}
+	
+	while (batteryLevel < 7 && !charging)
+	{
+		if (choiceBox("\x1B[47mBattery is too low!\nPlease plug in the console.\n\nContinue?") == NO)
+			return 0;
 	}
 	
 	DeviceList* deviceList = getDeviceList();
