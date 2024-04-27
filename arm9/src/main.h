@@ -10,8 +10,8 @@ extern "C" {
 #endif
 
 extern volatile bool programEnd;
-extern bool charging;
-extern u8 batteryLevel;
+extern volatile bool charging;
+extern volatile u8 batteryLevel;
 
 extern PrintConsole topScreen;
 extern PrintConsole bottomScreen;

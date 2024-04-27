@@ -11,6 +11,7 @@ extern "C" {
 
 typedef struct {
 	bool directory;
+	bool enabled;
 	char* label;
 	char* value;
 } Item;
@@ -28,7 +29,7 @@ typedef struct {
 Menu* newMenu();
 void freeMenu(Menu* m);
 
-void addMenuItem(Menu* m, char const* label, char const* value, bool directory);
+void addMenuItem(Menu* m, char const* label, char const* value, bool enabled, bool directory);
 void sortMenuItems(Menu* m);
 void setMenuHeader(Menu* m, const char* str);
 

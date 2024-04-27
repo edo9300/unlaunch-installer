@@ -35,7 +35,7 @@ void freeMenu(Menu* m)
 	m = NULL;
 }
 
-void addMenuItem(Menu* m, char const* label, char const* value, bool directory)
+void addMenuItem(Menu* m, char const* label, char const* value, bool enabled, bool directory)
 {
 	if (!m) return;
 
@@ -43,11 +43,12 @@ void addMenuItem(Menu* m, char const* label, char const* value, bool directory)
 	if (i >= ITEMS_PER_PAGE) return;
 
 	m->items[i].directory = directory;
+	m->items[i].enabled = enabled;
 
 	if (label)
 	{
-		m->items[i].label = (char*)malloc(64);
-		sprintf(m->items[i].label, "%.63s", label);
+		m->items[i].label = (char*)malloc(32);
+		sprintf(m->items[i].label, "%.31s", label);
 	}
 
 	if (value)
@@ -147,10 +148,16 @@ void printMenu(Menu* m)
 	{
 		if (m->items[i].label)
 		{
+			if(!m->items[i].enabled)
+				iprintf("\x1B[37m");	//gray
+
 			if (m->items[i].directory)
-				iprintf(" [%.58s]\n", m->items[i].label);
+				iprintf(" [%.26s]\n", m->items[i].label);
 			else
-				iprintf(" %.60s\n", m->items[i].label);
+				iprintf(" %.28s\n", m->items[i].label);
+
+			if(!m->items[i].enabled)
+				iprintf("\x1B[47m");	//white
 		}
 		else
 			iprintf(" \n");

@@ -42,10 +42,10 @@ const char* backgroundMenu()
 	
 	for(const auto& [bgName, bgPath] : bgs)
 	{
-		addMenuItem(m, bgName.data(), nullptr, 0);	
+		addMenuItem(m, bgName.data(), nullptr, true, false);	
 	}
-	addMenuItem(m, "Default", nullptr, 0);
-	addMenuItem(m, "Cancel", nullptr, 0);
+	addMenuItem(m, "Default", nullptr, true, false);
+	addMenuItem(m, "Cancel", nullptr, true, false);
 
 	m->cursor = 0;
 
@@ -60,8 +60,13 @@ const char* backgroundMenu()
 		if (moveCursor(m))
 			printMenu(m);
 
-		if (keysDown() & KEY_A)
+		if (auto keys = keysDown(); keys & KEY_A)
 			break;
+		else if(keys & KEY_B)
+		{
+			m->cursor = bgs.size() + 1;
+			break;
+		}
 	}
 
 	const char* result = nullptr;

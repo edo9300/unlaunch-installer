@@ -73,22 +73,17 @@ static int mainMenu(int cursor)
 	Menu* m = newMenu();
 	setMenuHeader(m, "MAIN MENU");
 
-	char uninstallStr[32], installStr[32], soundPatchesStr[64], tidPatchesStr[32], customBgStr[32];
-	sprintf(uninstallStr, "\x1B[%02omUninstall unlaunch", unlaunchFound ? 047 : 037);
-	sprintf(customBgStr, "\x1B[%02omCustom background", (foundUnlaunchInstallerVersion != INVALID) ? 047 : 037);
-	sprintf(tidPatchesStr, "\x1B[%02omDisable all patches: %s",
-						(foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) ? 047 : 037,
+	char soundPatchesStr[64], tidPatchesStr[32];
+	sprintf(tidPatchesStr, "Disable all patches: %s",
 						disableAllPatches ? "On" : "Off");
-	sprintf(soundPatchesStr, "\x1B[%02omEnable sound and splash: %s",
-							(foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL) ? 047 : 037,
+	sprintf(soundPatchesStr, "Enable sound and splash: %s",
 							enableSoundAndSplash ? "On" : "Off");
-	sprintf(installStr, "\x1B[%02omInstall unlaunch", (foundUnlaunchInstallerVersion != INVALID && !unlaunchFound) ? 047 : 037);
-	addMenuItem(m, uninstallStr, NULL, 0);
-	addMenuItem(m, customBgStr, NULL, true);
-	addMenuItem(m, tidPatchesStr, NULL, 0);
-	addMenuItem(m, soundPatchesStr, NULL, 0);
-	addMenuItem(m, installStr, NULL, 0);
-	addMenuItem(m, "\x1B[47mExit", NULL, 0);
+	addMenuItem(m, "Uninstall unlaunch", NULL, unlaunchFound, false);
+	addMenuItem(m, "Custom background", NULL, foundUnlaunchInstallerVersion != INVALID, true);
+	addMenuItem(m, tidPatchesStr, NULL, foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0, false);
+	addMenuItem(m, soundPatchesStr, NULL, foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL, false);
+	addMenuItem(m, "Install unlaunch", NULL, foundUnlaunchInstallerVersion != INVALID && !unlaunchFound, false);
+	addMenuItem(m, "Exit", NULL, true, false);
 
 	m->cursor = cursor;
 
@@ -290,7 +285,6 @@ int main(int argc, char **argv)
 			case MAIN_MENU_TID_PATCHES:
 				if(foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) {
 					disableAllPatches = !disableAllPatches;
-					enableSoundAndSplash = true;
 				}
 				break;
 				
