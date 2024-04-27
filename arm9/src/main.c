@@ -22,6 +22,7 @@ static const char* splashSoundBinaryPatchPath = NULL;
 static const char* customBgPath = NULL;
 volatile bool charging = false;
 volatile u8 batteryLevel = 0;
+static bool wantsUnsafeUnlaunchUninstall = false;
 
 PrintConsole topScreen;
 PrintConsole bottomScreen;
@@ -32,7 +33,8 @@ enum {
 	MAIN_MENU_TID_PATCHES,
 	MAIN_MENU_SOUND_SPLASH_PATCHES,
 	MAIN_MENU_SAFE_UNLAUNCH_INSTALL,
-	MAIN_MENU_EXIT
+	MAIN_MENU_EXIT,
+	MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP,
 };
 
 static void setupScreens()
@@ -92,11 +94,16 @@ static int mainMenu(int cursor)
 	addMenuItem(m, soundPatchesStr, NULL, foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL, false);
 	addMenuItem(m, installUnlaunchStr, NULL, foundUnlaunchInstallerVersion != INVALID && !unlaunchFound, false);
 	addMenuItem(m, "Exit", NULL, true, false);
+	if(wantsUnsafeUnlaunchUninstall)
+		addMenuItem(m, "Uninstall unlaunch no backup", NULL, unlaunchFound, false);
 
 	m->cursor = cursor;
 
 	//bottom screen
 	printMenu(m);
+
+	int konamiCode = 0;
+	bool konamiCodeCooldown = false;
 
 	while (!programEnd)
 	{
@@ -108,6 +115,29 @@ static int mainMenu(int cursor)
 
 		if (keysDown() & KEY_A)
 			break;
+
+		if(wantsUnsafeUnlaunchUninstall)
+			continue;
+
+		int held = keysHeld();
+
+		if ((held & (KEY_L | KEY_R | KEY_Y)) == (KEY_L | KEY_R | KEY_Y))
+		{
+			if(held == (KEY_L | KEY_R | KEY_Y) && !konamiCodeCooldown)
+			{
+				konamiCodeCooldown = true;
+				++konamiCode;
+			}
+		}
+		else
+		{
+			konamiCodeCooldown = false;
+		}
+		if (konamiCode == 5)
+		{
+			wantsUnsafeUnlaunchUninstall = true;
+			addMenuItem(m, "Uninstall unlaunch no backup", NULL, unlaunchFound, false);
+		}
 	}
 
 	int result = m->cursor;
@@ -158,22 +188,22 @@ int main(int argc, char **argv)
 		messageBox("nand init \x1B[31mfailed\n\x1B[47m");
 		return 0;
 	}
-	
+
 	while (batteryLevel < 7 && !charging)
 	{
 		if (choiceBox("\x1B[47mBattery is too low!\nPlease plug in the console.\n\nContinue?") == NO)
 			return 0;
 	}
-	
+
 	DeviceList* deviceList = getDeviceList();
-	
+
 	const char* installerPath = (argc > 0) ? argv[0] : (deviceList ? deviceList->appname :  "sd:/ntrboot.nds");
-	
+
 	if (!nitroFSInit(installerPath))
 	{
 		messageBox("nitroFSInit()...\x1B[31mFailed\n\x1B[47m");
 	}
-	
+
 	if (fileExists("sd:/unlaunch.dsi"))
 	{
 		foundUnlaunchInstallerVersion = loadUnlaunchInstaller("sd:/unlaunch.dsi");
@@ -184,7 +214,7 @@ int main(int argc, char **argv)
 						"Attempting to use the bundled one.");
 		}
 	}
-	
+
 	if(foundUnlaunchInstallerVersion == INVALID)
 	{
 		foundUnlaunchInstallerVersion = loadUnlaunchInstaller("nitro:/unlaunch.dsi");
@@ -195,7 +225,7 @@ int main(int argc, char **argv)
 						"Installing unlaunch won't be possible.");
 		}
 	}
-	
+
 	if(fileExists("nitro:/unlaunch-patch.bin"))
 	{
 		splashSoundBinaryPatchPath = "nitro:/unlaunch-patch.bin";
@@ -236,11 +266,11 @@ int main(int argc, char **argv)
 			}
 			// HWINFO_S may not always exist (PRE_IMPORT). Fill in defaults if that happens.
 		}
-		
+
 		// I own and know of many people with retail and dev prototypes
 		// These can normally be identified by having the region set to ALL (0x41)
 		retailConsole = (region != 0x41 && region != 0xFF);
-		
+
 		unsigned long long tmdSize = getFileSizePath(hnaaTmdPath);
 		if (tmdSize > 520)
 		{
@@ -260,8 +290,10 @@ int main(int argc, char **argv)
 		switch (cursor)
 		{
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL:
+			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP:
 				if(unlaunchFound && nandio_unlock_writing()) {
-					if(uninstallUnlaunch(retailConsole, hnaaUnlaunchFound, retailLauncherTmdPath))
+					bool unsafeUninstall = wantsUnsafeUnlaunchUninstall && cursor == MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP;
+					if(uninstallUnlaunch(retailConsole, hnaaUnlaunchFound, retailLauncherTmdPath, unsafeUninstall))
 					{
 						messageBox("Uninstall successful!\n");
 						unlaunchFound = false;
@@ -273,7 +305,7 @@ int main(int argc, char **argv)
 					nandio_synchronize_fats();
 				}
 				break;
-				
+
 			case MAIN_MENU_CUSTOM_BG:
 				if(foundUnlaunchInstallerVersion != INVALID) {
 					const char* customBg = backgroundMenu();
@@ -289,13 +321,13 @@ int main(int argc, char **argv)
 					}
 				}
 				break;
-			
+
 			case MAIN_MENU_TID_PATCHES:
 				if(foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) {
 					disableAllPatches = !disableAllPatches;
 				}
 				break;
-				
+
 			case MAIN_MENU_SOUND_SPLASH_PATCHES:
 				if(foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL) {
 					enableSoundAndSplash = !enableSoundAndSplash;

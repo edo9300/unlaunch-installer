@@ -65,7 +65,7 @@ bool isLauncherTmdPatched(const char* path)
 	return c == 0x47;
 }
 
-static bool restoreMainTmd(const char* path, bool hasHNAABackup)
+static bool restoreMainTmd(const char* path, bool hasHNAABackup, bool removeHNAABackup)
 {
 	FILE* launcherTmd = fopen(path, "r+b");
 	if(!launcherTmd)
@@ -83,6 +83,20 @@ static bool restoreMainTmd(const char* path, bool hasHNAABackup)
 		fseek(launcherTmd, -1, SEEK_CUR);
 		c = 0x48;
 		fwrite(&c, 1, 1, launcherTmd);
+		fclose(launcherTmd);
+		if(removeHNAABackup && hasHNAABackup)
+		{
+			if(!toggleFileReadOnly(hnaaTmdPath, false))
+			{
+				messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n");
+			}
+			else
+			{
+				remove(hnaaTmdPath);
+				rmdir("nand:/title/00030017/484e4141/content");
+				rmdir("nand:/title/00030017/484e4141");
+			}
+		}
 	}
 	else if(c != 0x47)
 	{
@@ -93,7 +107,7 @@ static bool restoreMainTmd(const char* path, bool hasHNAABackup)
 			// This is also a good idea to make sure the tmd is 520b.
 			// You will have a much higher brick risk if something goes wrong with a tmd over 520b.
 			// See: http://docs.randommeaninglesscharacters.com/unlaunch.html
-			if(!hasHNAABackup)
+			if(!hasHNAABackup && !removeHNAABackup)
 			{
 				auto choiceString = [&]{
 					if(installerVersion != INVALID)
@@ -129,6 +143,19 @@ static bool restoreMainTmd(const char* path, bool hasHNAABackup)
 					}
 				}
 			}
+			if(removeHNAABackup && hasHNAABackup)
+			{
+				if(!toggleFileReadOnly(hnaaTmdPath, false))
+				{
+					messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n");
+				}
+				else
+				{
+					remove(hnaaTmdPath);
+					rmdir("nand:/title/00030017/484e4141/content");
+					rmdir("nand:/title/00030017/484e4141");
+				}
+			}
 			if (ftruncate(fileno(launcherTmd), 520) != 0) {
 				messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
 	   			fclose(launcherTmd);
@@ -141,7 +168,6 @@ static bool restoreMainTmd(const char* path, bool hasHNAABackup)
 		fclose(launcherTmd);
 		return false;
 	}
-	fclose(launcherTmd);
 	return true;
 }
 
@@ -188,7 +214,7 @@ static bool restoreProtoTmd(const char* path)
 	return true;
 }
 
-bool uninstallUnlaunch(bool retailConsole, bool hasHNAABackup, const char* retailLauncherTmdPath)
+bool uninstallUnlaunch(bool retailConsole, bool hasHNAABackup, const char* retailLauncherTmdPath, bool removeHNAABackup)
 {
 	// TODO: handle retailLauncherTmdPresentAndToBePatched = false on retail consoles
 	if (retailConsole) {
@@ -196,7 +222,7 @@ bool uninstallUnlaunch(bool retailConsole, bool hasHNAABackup, const char* retai
 		{
 			return false;
 		}			
-		if (!restoreMainTmd(retailLauncherTmdPath, hasHNAABackup))
+		if (!restoreMainTmd(retailLauncherTmdPath, hasHNAABackup, removeHNAABackup))
 		{
 			return false;
 		}

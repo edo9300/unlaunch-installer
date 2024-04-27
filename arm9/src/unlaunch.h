@@ -15,7 +15,7 @@ typedef enum UNLAUNCH_VERSION {
 
 const char* getUnlaunchVersionString(UNLAUNCH_VERSION);
 
-bool uninstallUnlaunch(bool notProto, bool hasHNAABackup, const char* retailLauncherTmdPath);
+bool uninstallUnlaunch(bool notProto, bool hasHNAABackup, const char* retailLauncherTmdPath, bool removeHNAABackup);
 bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath);
 
 bool isLauncherTmdPatched(const char* path);
