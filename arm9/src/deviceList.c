@@ -44,11 +44,10 @@ DeviceList* getDeviceList(void)
 		if(isSd)
 		{
 			//transform the root path to sd:/ (can be sdmc:/, nand:/,  nand2:/, etc)
-			memmove(list->appname + (deviceNameLen - 2), list->appname + deviceNameLen, sizeof(list->appname) - deviceNameLen);
+			memmove(list->appname + 2, list->appname + deviceNameLen, sizeof(list->appname) - deviceNameLen);
 			list->appname[0] = 's';
 			list->appname[1] = 'd';
-			list->appname[sizeof(list->appname) - 1] = '\0';
-			list->appname[sizeof(list->appname) - 2] = '\0';
+			memset(list->appname + (sizeof(list->appname) - deviceNameLen + 2), 0, deviceNameLen - 2);
 		}
 		gotDeviceList = true;
 	}
