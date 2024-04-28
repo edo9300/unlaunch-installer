@@ -307,7 +307,13 @@ int main(int argc, char **argv)
 		}
 	}
 
-	messageBox("\x1B[41mWARNING:\x1B[47m This tool can write to\nyour internal NAND!\n\nThis always has a risk, albeit\nlow, of \x1B[41mbricking\x1B[47m your system\nand should be done with caution!\n\nIf you have not yet done so,\nyou should make a NAND backup.");
+	messageBox("\x1B[41mWARNING:\x1B[47m This tool can write to\n"
+				"your internal NAND!\n\n"
+				"This always has a risk, albeit\n"
+				"low, of \x1B[41mbricking\x1B[47m your system\n"
+				"and should be done with caution!\n\n"
+				"If you have not yet done so,\n"
+				"you should make a NAND backup.");
 	//main menu
 	int cursor = 0;
 

@@ -16,6 +16,7 @@ This can modify your internal system NAND! There is *always* a risk of
 This installer comes bundled with a specific version of unlaunch (2.0), but can
 load a separate unlaunch installer from the root of the sd card, named
 `unlaunch.dsi`.
+
 Supported unlaunch versions are 1.8, 1.9 and 2.0, since earlier ones don't work
 if installed with this new method.
 
@@ -23,21 +24,25 @@ if installed with this new method.
 The Nintendo DSi's stage2 has a failsafe where it will load a backup launcher
 (HNAA) if it can't find the real one (eg. missing, corrupted), even on retail
 consoles.
-Whereas the official unlaunch installer appends itself to the tmd of the
-primary launcher (thus leaving the console bricked in case of failed install
-uninstall), the safe unlaunch installer takes advantage of this feature
-by installing unlaunch to the backup launcher.
-To make then stage2 actually load unlaunch from the backup launcher,
-the main TMD is "broken" by only changing a byte in it so that it skips it and
-loads the exploited one from the backup.
+
+The official installer will append itself to the tmd of the "real" launcher.
+This leaves the console bricked in case of failed install or uninstall (since
+the backup launcher doesn't exist, stage2 can't save you).
+The safe unlaunch installer takes advantage of this feature by installing
+unlaunch to the backup launcher.
+The official launcher's TMD is "broken" by changing a byte, making stage2
+load unlaunch in the backup launcher. 
+
 This is safer than normal unlaunch installs because as long as the main TMD
 isn't touched, the system can't be bricked by those operations (apart from
-total nand failure), and the moment the main TMD is tampered with, unlaunch is
+total nand failure), and when the main TMD is tampered with, unlaunch is
 already there as fallback in case of errors.
-Reverting this operation (thus uninstalling unlaunch) is also safer as this
-program only has to restore that previously changed byte to restore the main
-TMD, this allows to keep backup unlaunch "installed" as general brick
-protection since it won't interfere with the system.
+Uninstalling is also safer as this program only has to restore that
+previously changed byte to restore the main TMD.
+This allows to keep backup unlaunch "installed" as general brick
+protection since it won't interfere with the system. As a bonus, if you
+sell/trade you console in the future and the new owner uses the official
+installer, they'll be protected from bricks.
 
 ## Credits
 - [DevkitPro](https://devkitpro.org/): devkitARM and libnds
