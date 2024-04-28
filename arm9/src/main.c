@@ -143,6 +143,7 @@ static int mainMenu(int cursor)
 		if (konamiCode == 5)
 		{
 			advancedOptionsUnlocked = true;
+			addMenuItem(m, tidPatchesStr, NULL, foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0, false);
 			addMenuItem(m, "Uninstall unlaunch no backup", NULL, unlaunchFound, false);
 			addMenuItem(m, "Write nocash footer", NULL, needsNocashFooterToBeWritten, false);
 		}
@@ -196,12 +197,12 @@ int main(int argc, char **argv)
 		messageBox("nand init \x1B[31mfailed\n\x1B[47m");
 		return 0;
 	}
-	
+
 	NocashFooter footer;
-	
+
 	nandio_read_nocash_footer(&footer);
 	nandio_construct_nocash_footer(&computedNocashFooter);
-	
+
 	if(!(needsNocashFooterToBeWritten = !isFooterValid(&footer)))
 	{
 		if(memcmp(&footer, &computedNocashFooter, sizeof(footer)) != 0)
@@ -215,7 +216,7 @@ int main(int argc, char **argv)
 			needsNocashFooterToBeWritten = true;
 		}
 	}
-	
+
 	while (batteryLevel < 7 && !charging)
 	{
 		if (choiceBox("\x1B[47mBattery is too low!\nPlease plug in the console.\n\nContinue?") == NO)
@@ -318,45 +319,58 @@ int main(int argc, char **argv)
 		{
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL:
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP:
-				if(unlaunchFound && nandio_unlock_writing()) {
-					bool unsafeUninstall = advancedOptionsUnlocked && cursor == MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP;
-					printf("Uninstalling");
-					if(needsNocashFooterToBeWritten)
-					{
-						printf("Writing nocash footer\n");
-						if(!nandio_write_nocash_footer(&computedNocashFooter))
-						{
-							messageBox("Failed to write nocash footer");
-							break;
-						}
-						needsNocashFooterToBeWritten = false;
-					}
-					if(uninstallUnlaunch(retailConsole, hnaaUnlaunchFound, retailLauncherTmdPath, unsafeUninstall))
-					{
-						messageBox("Uninstall successful!\n");
-						unlaunchFound = false;
-					} else {
-						messageBox("\x1B[31mError:\x1B[33m Uninstall failed\n");
-					}
-					nandio_lock_writing();
-					printf("Synchronizing FAT tables...\n");
-					nandio_synchronize_fats();
+				if(!unlaunchFound)
+				{
+					break;
 				}
+				if(!nandio_unlock_writing())
+				{
+					break;
+				}
+				bool unsafeUninstall = advancedOptionsUnlocked && cursor == MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP;
+				printf("Uninstalling");
+				if(needsNocashFooterToBeWritten)
+				{
+					printf("Writing nocash footer\n");
+					if(!nandio_write_nocash_footer(&computedNocashFooter))
+					{
+						nandio_lock_writing();
+						messageBox("Failed to write nocash footer");
+						break;
+					}
+					needsNocashFooterToBeWritten = false;
+				}
+				if(uninstallUnlaunch(retailConsole, hnaaUnlaunchFound, retailLauncherTmdPath, unsafeUninstall))
+				{
+					messageBox("Uninstall successful!\n");
+					unlaunchFound = false;
+				}
+				else
+				{
+					messageBox("\x1B[31mError:\x1B[33m Uninstall failed\n");
+				}
+				nandio_lock_writing();
+				printf("Synchronizing FAT tables...\n");
+				nandio_synchronize_fats();
 				break;
 
 			case MAIN_MENU_CUSTOM_BG:
-				if(foundUnlaunchInstallerVersion != INVALID) {
-					const char* customBg = backgroundMenu();
-					if(!customBg)
-						break;
-					if(strcmp(customBg, "default") == 0)
-					{
-						customBgPath = NULL;
-					}
-					else
-					{
-						customBgPath = customBg;
-					}
+				if(foundUnlaunchInstallerVersion == INVALID)
+				{
+					break;
+				}
+				const char* customBg = backgroundMenu();
+				if(!customBg)
+				{
+					break;
+				}
+				if(strcmp(customBg, "default") == 0)
+				{
+					customBgPath = NULL;
+				}
+				else
+				{
+					customBgPath = customBg;
 				}
 				break;
 
@@ -373,48 +387,66 @@ int main(int argc, char **argv)
 				break;
 
 			case MAIN_MENU_SAFE_UNLAUNCH_INSTALL:
-				if (!unlaunchFound && foundUnlaunchInstallerVersion != INVALID && (choiceBox("Install unlaunch?") == YES)
-					&& (retailLauncherTmdPresentAndToBePatched || (choiceBox("There doesn't seem to be a launcher.tmd\nfile matcing the hwinfo file\nKeep installing?") == YES))
-					&& nandio_unlock_writing())
+				if(unlaunchFound || foundUnlaunchInstallerVersion == INVALID)
 				{
-					printf("Installing\n");
-					if(needsNocashFooterToBeWritten)
-					{
-						printf("Writing nocash footer\n");
-						if(!nandio_write_nocash_footer(&computedNocashFooter))
-						{
-							messageBox("Failed to write nocash footer");
-							break;
-						}
-						needsNocashFooterToBeWritten = false;
-					}
-					if(installUnlaunch(retailConsole,
-										retailLauncherTmdPresentAndToBePatched ? retailLauncherTmdPath : NULL,
-										disableAllPatches,
-										enableSoundAndSplash ? splashSoundBinaryPatchPath : NULL,
-										customBgPath))
-					{
-						messageBox("Install successful!\n");
-						unlaunchFound = true;
-					} else {
-						messageBox("\x1B[31mError:\x1B[33m Install failed\n");
-					}
-					nandio_lock_writing();
-					printf("Synchronizing FAT tables...\n");
-					nandio_synchronize_fats();
+					break;
 				}
-				break;
-				
-			case MAIN_MENU_WRITE_NOCASH_FOOTER_ONLY:
+				if(choiceBox("Install unlaunch?") == NO)
+				{
+					break;
+				}
+				if(!retailLauncherTmdPresentAndToBePatched
+					&& (choiceBox("There doesn't seem to be a launcher.tmd\n"
+									"file matcing the hwinfo file\n"
+									"Keep installing?") == NO))
+				{
+					break;
+				}
+				if(!nandio_unlock_writing())
+				{
+					break;
+				}
+				printf("Installing\n");
 				if(needsNocashFooterToBeWritten)
 				{
+					printf("Writing nocash footer\n");
 					if(!nandio_write_nocash_footer(&computedNocashFooter))
 					{
+						nandio_lock_writing();
 						messageBox("Failed to write nocash footer");
 						break;
 					}
 					needsNocashFooterToBeWritten = false;
 				}
+				if(installUnlaunch(retailConsole,
+									retailLauncherTmdPresentAndToBePatched ? retailLauncherTmdPath : NULL,
+									disableAllPatches,
+									enableSoundAndSplash ? splashSoundBinaryPatchPath : NULL,
+									customBgPath))
+				{
+					messageBox("Install successful!\n");
+					unlaunchFound = true;
+				}
+				else
+				{
+					messageBox("\x1B[31mError:\x1B[33m Install failed\n");
+				}
+				nandio_lock_writing();
+				printf("Synchronizing FAT tables...\n");
+				nandio_synchronize_fats();
+				break;
+
+			case MAIN_MENU_WRITE_NOCASH_FOOTER_ONLY:
+				if(!needsNocashFooterToBeWritten)
+				{
+					break;
+				}
+				if(!nandio_write_nocash_footer(&computedNocashFooter))
+				{
+					messageBox("Failed to write nocash footer");
+					break;
+				}
+				needsNocashFooterToBeWritten = false;
 				break;
 
 			case MAIN_MENU_EXIT:
