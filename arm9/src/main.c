@@ -33,10 +33,10 @@ PrintConsole bottomScreen;
 enum {
 	MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL,
 	MAIN_MENU_CUSTOM_BG,
-	MAIN_MENU_TID_PATCHES,
 	MAIN_MENU_SOUND_SPLASH_PATCHES,
 	MAIN_MENU_SAFE_UNLAUNCH_INSTALL,
 	MAIN_MENU_EXIT,
+	MAIN_MENU_TID_PATCHES,
 	MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP,
 	MAIN_MENU_WRITE_NOCASH_FOOTER_ONLY,
 };
@@ -94,12 +94,12 @@ static int mainMenu(int cursor)
 	}
 	addMenuItem(m, "Uninstall unlaunch", NULL, unlaunchFound, false);
 	addMenuItem(m, "Custom background", NULL, foundUnlaunchInstallerVersion != INVALID, true);
-	addMenuItem(m, tidPatchesStr, NULL, foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0, false);
 	addMenuItem(m, soundPatchesStr, NULL, foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL, false);
 	addMenuItem(m, installUnlaunchStr, NULL, foundUnlaunchInstallerVersion != INVALID && !unlaunchFound, false);
 	addMenuItem(m, "Exit", NULL, true, false);
 	if(advancedOptionsUnlocked)
 	{
+		addMenuItem(m, tidPatchesStr, NULL, foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0, false);
 		addMenuItem(m, "Uninstall unlaunch no backup", NULL, unlaunchFound, false);
 		addMenuItem(m, "Write nocash footer", NULL, needsNocashFooterToBeWritten, false);
 	}
@@ -361,7 +361,7 @@ int main(int argc, char **argv)
 				break;
 
 			case MAIN_MENU_TID_PATCHES:
-				if(foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) {
+				if(advancedOptionsUnlocked && (foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0)) {
 					disableAllPatches = !disableAllPatches;
 				}
 				break;
