@@ -12,6 +12,13 @@ This can modify your internal system NAND! There is *always* a risk of
 - Keeps a recovery copy of unlaunch in NAND to protect against future bricks
   (only on retail consoles)
 
+## Notes
+This installer comes bundled with a specific version of unlaunch (2.0), but can
+load a separate unlaunch installer from the root of the sd card, named
+`unlaunch.dsi`.
+Supported unlaunch versions are 1.8, 1.9 and 2.0, since earlier ones don't work
+if installed with this new method.
+
 ## Differences with official installer
 The Nintendo DSi's stage2 has a failsafe where it will load a backup launcher
 (HNAA) if it can't find the real one (eg. missing, corrupted), even on retail
