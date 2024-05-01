@@ -65,6 +65,35 @@ bool isLauncherTmdPatched(const char* path)
 	return c == 0x47;
 }
 
+static bool removeHnaaLauncher()
+{
+	auto* errString = [] -> const char* {
+		if(!toggleFileReadOnly(hnaaTmdPath, false))
+		{
+			return "\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n";
+		}
+		if(!removeIfExists(hnaaTmdPath))
+		{
+			return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's title.tmd\n";
+		}
+		if(!removeIfExists("nand:/title/00030017/484e4141/content"))
+		{
+			return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's content folder\n";
+		}
+		if(!removeIfExists("nand:/title/00030017/484e4141"))
+		{
+			return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's 484e4141 folder\n";
+		}
+		return nullptr;
+	}();
+	if(errString)
+	{
+		messageBox(errString);
+		return false;
+	}
+	return true;
+}
+
 static bool restoreMainTmd(const char* path, bool hasHNAABackup, bool removeHNAABackup)
 {
 	FILE* launcherTmd = fopen(path, "r+b");
@@ -86,16 +115,7 @@ static bool restoreMainTmd(const char* path, bool hasHNAABackup, bool removeHNAA
 		fclose(launcherTmd);
 		if(removeHNAABackup && hasHNAABackup)
 		{
-			if(!toggleFileReadOnly(hnaaTmdPath, false))
-			{
-				messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n");
-			}
-			else
-			{
-				remove(hnaaTmdPath);
-				rmdir("nand:/title/00030017/484e4141/content");
-				rmdir("nand:/title/00030017/484e4141");
-			}
+			removeHnaaLauncher();
 		}
 	}
 	else if(c != 0x47)
@@ -145,16 +165,7 @@ static bool restoreMainTmd(const char* path, bool hasHNAABackup, bool removeHNAA
 			}
 			if(removeHNAABackup && hasHNAABackup)
 			{
-				if(!toggleFileReadOnly(hnaaTmdPath, false))
-				{
-					messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n");
-				}
-				else
-				{
-					remove(hnaaTmdPath);
-					rmdir("nand:/title/00030017/484e4141/content");
-					rmdir("nand:/title/00030017/484e4141");
-				}
+				removeHnaaLauncher();
 			}
 			if (ftruncate(fileno(launcherTmd), 520) != 0) {
 				messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
@@ -208,7 +219,7 @@ static bool restoreProtoTmd(const char* path)
 		messageBox("\x1B[31mError:\x1B[33m No original tmd found!\nCan't uninstall unlaunch.\n");
 		return false;
 	}
-	remove(path);
+	removeIfExists(path);
 	rename(hnaaBackupTmdPath, path);
 	toggleFileReadOnly(path, false);
 	return true;
@@ -255,7 +266,7 @@ static bool writeUnlaunchTmd(const char* path)
 	if(!writeToFile(targetTmd, unlaunchInstallerBuffer, unlaunchInstallerSize + 520))
 	{
 		fclose(targetTmd);
-		remove(path);
+		removeIfExists(path);
 		messageBox("\x1B[31mError:\x1B[33m Failed write unlaunch to tmd\n");
 		return false;
 	}
@@ -264,7 +275,7 @@ static bool writeUnlaunchTmd(const char* path)
 	
 	if(!calculateFileSha1Path(path, actualDigest.data()) || expectedDigest != actualDigest)
 	{
-		remove(path);
+		removeIfExists(path);
 		messageBox("\x1B[31mError:\x1B[33m Unlaunch tmd was not properly written\n");
 		return false;
 	}
@@ -287,8 +298,7 @@ static bool writeUnlaunchToHNAAFolder()
 	}
 	if (!writeUnlaunchTmd(hnaaTmdPath))
 	{
-		rmdir("nand:/title/00030017/484e4141/content");
-		rmdir("nand:/title/00030017/484e4141");
+		removeHnaaLauncher();
 		return false;
 	}
 
@@ -296,9 +306,7 @@ static bool writeUnlaunchToHNAAFolder()
 	if(!toggleFileReadOnly(hnaaTmdPath, true))
 	{
 		messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as read only\n");
-		remove(hnaaTmdPath);
-		rmdir("nand:/title/00030017/484e4141/content");
-		rmdir("nand:/title/00030017/484e4141");
+		removeHnaaLauncher();
 		return false;
 	}
 	return true;
@@ -317,16 +325,7 @@ static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath)
 		// Set tmd as writable in case unlaunch was already installed through the old method
 		if(!toggleFileReadOnly(retailLauncherTmdPath, false) || !patchMainTmd(retailLauncherTmdPath))
 		{
-			if(!toggleFileReadOnly(hnaaTmdPath, false))
-			{
-				messageBox("\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n");
-			}
-			else
-			{
-				remove(hnaaTmdPath);
-				rmdir("nand:/title/00030017/484e4141/content");
-				rmdir("nand:/title/00030017/484e4141");
-			}
+			removeHnaaLauncher();
 			return false;
 		}
 		if (!toggleFileReadOnly(retailLauncherTmdPath, true))

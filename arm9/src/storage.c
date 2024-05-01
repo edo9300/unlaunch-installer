@@ -221,3 +221,8 @@ bool safeCreateDir(const char* path)
 	messageBox(errorStr);
 	return false;
 }
+
+bool removeIfExists(const char* path)
+{
+	return remove(path) == 0 || errno == ENOENT;
+}

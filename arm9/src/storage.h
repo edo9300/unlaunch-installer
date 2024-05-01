@@ -22,6 +22,9 @@ bool calculateFileSha1Path(const char* path, void* digest);
 //Directories
 bool safeCreateDir(const char* path);
 
+//Files and directories
+bool removeIfExists(const char* path);
+
 #ifdef __cplusplus
 }
 #endif
