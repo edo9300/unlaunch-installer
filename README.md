@@ -20,6 +20,10 @@ load a separate unlaunch installer from the root of the sd card, named
 Supported unlaunch versions are 1.8, 1.9 and 2.0, since earlier ones don't work
 if installed with this new method.
 
+Due to some unforunate version differences, the install method used by this
+application won't be usable on consoles with firmware 1.4.2 (1.4.3 for china).
+So installing on consoles that ship that version will be prevented
+
 ## Differences with official installer
 The Nintendo DSi's stage2 has a failsafe where it will load a backup launcher
 (HNAA) if it can't find the real one (eg. missing, corrupted), even on retail

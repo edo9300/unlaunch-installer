@@ -25,6 +25,7 @@ volatile bool charging = false;
 volatile u8 batteryLevel = 0;
 static bool advancedOptionsUnlocked = false;
 static bool needsNocashFooterToBeWritten = false;
+static bool isLauncherVersionSupported = true;
 static NocashFooter computedNocashFooter;
 
 PrintConsole topScreen;
@@ -36,9 +37,9 @@ enum {
 	MAIN_MENU_SOUND_SPLASH_PATCHES,
 	MAIN_MENU_SAFE_UNLAUNCH_INSTALL,
 	MAIN_MENU_EXIT,
-	MAIN_MENU_TID_PATCHES,
 	MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP,
 	MAIN_MENU_WRITE_NOCASH_FOOTER_ONLY,
+	MAIN_MENU_TID_PATCHES,
 };
 
 static void setupScreens()
@@ -92,16 +93,20 @@ static int mainMenu(int cursor)
 	{
 		strcpy(installUnlaunchStr, "Install unlaunch");
 	}
-	addMenuItem(m, "Uninstall unlaunch", NULL, unlaunchFound, false);
-	addMenuItem(m, "Custom background", NULL, foundUnlaunchInstallerVersion != INVALID, true);
-	addMenuItem(m, soundPatchesStr, NULL, foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL, false);
-	addMenuItem(m, installUnlaunchStr, NULL, foundUnlaunchInstallerVersion != INVALID && !unlaunchFound, false);
+	addMenuItem(m, "Uninstall unlaunch", NULL, unlaunchFound && isLauncherVersionSupported, false);
+	addMenuItem(m, "Custom background", NULL, foundUnlaunchInstallerVersion != INVALID && isLauncherVersionSupported, true);
+	addMenuItem(m, soundPatchesStr, NULL, foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL && isLauncherVersionSupported, false);
+	addMenuItem(m, installUnlaunchStr, NULL, foundUnlaunchInstallerVersion != INVALID && !unlaunchFound && isLauncherVersionSupported, false);
 	addMenuItem(m, "Exit", NULL, true, false);
-	if(advancedOptionsUnlocked)
+	if(!isLauncherVersionSupported)
 	{
-		addMenuItem(m, tidPatchesStr, NULL, foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0, false);
+		addMenuItem(m, "Uninstall unlaunch no backup", NULL, unlaunchFound, false);
+	}
+	else if(advancedOptionsUnlocked)
+	{
 		addMenuItem(m, "Uninstall unlaunch no backup", NULL, unlaunchFound, false);
 		addMenuItem(m, "Write nocash footer", NULL, needsNocashFooterToBeWritten, false);
+		addMenuItem(m, tidPatchesStr, NULL, (foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) && isLauncherVersionSupported, false);
 	}
 
 	m->cursor = cursor;
@@ -143,9 +148,13 @@ static int mainMenu(int cursor)
 		if (konamiCode == 5)
 		{
 			advancedOptionsUnlocked = true;
-			addMenuItem(m, tidPatchesStr, NULL, foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0, false);
-			addMenuItem(m, "Uninstall unlaunch no backup", NULL, unlaunchFound, false);
+			// Enabled by default when unsupported
+			if(isLauncherVersionSupported)
+			{
+				addMenuItem(m, "Uninstall unlaunch no backup", NULL, unlaunchFound, false);
+			}
 			addMenuItem(m, "Write nocash footer", NULL, needsNocashFooterToBeWritten, false);
+			addMenuItem(m, tidPatchesStr, NULL, (foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) && isLauncherVersionSupported, false);
 		}
 	}
 
@@ -278,19 +287,45 @@ int main(int argc, char **argv)
 			region = launcherTid & 0xFF;
 
 			sprintf(retailLauncherTmdPath, "nand:/title/00030017/%08lx/content/title.tmd", launcherTid);
-			unsigned long long tmdSize = getFileSizePath(retailLauncherTmdPath);
-			if (tmdSize > 520)
+			FILE* tmd = fopen(retailLauncherTmdPath, "rb");
+			unsigned long long tmdSize = getFileSize(tmd);
+			if(!tmd || tmdSize < 520)
 			{
-				unlaunchFound = true;
-			}
-			else if(tmdSize != 520)
-			{
-				//if size isn't 520 then the tmd either is not present (size 0), or is already invalid, thus no need to patch
+				//if size isn't 520 then the tmd either is not present, or is already invalid, thus no need to patch
 				retailLauncherTmdPresentAndToBePatched = false;
 			}
 			else
 			{
-				mainTmdIsPatched = isLauncherTmdPatched(retailLauncherTmdPath);
+				unsigned long long tmdSize = getFileSize(tmd);
+				if (tmdSize > 520)
+				{
+					unlaunchFound = true;
+				}
+				else
+				{
+					mainTmdIsPatched = isLauncherTmdPatched(retailLauncherTmdPath);
+				}
+				fseek(tmd, 0x1E4, SEEK_SET);
+				unsigned int contentId;
+				fread(&contentId, sizeof(contentId), 1, tmd);
+				// Launcher v4, build v1024 (shipped with firmware 1.4.2 (not sure about J, and 1.4.3 for china)
+				// will fail to launch if another tmd withouth appropriate application, or an invalid
+				// tmd (in our case the one installed from unlaunch) is found in the HNAA launcher folder
+				// there's really no workaround to that, so that specific version is blacklisted and only uninstalling
+				// an "officially" installed unlaunch without leaving any backup behind will be allowed
+				if(contentId == 0x04000000)
+				{
+					isLauncherVersionSupported = false;
+					messageBox("\x1B[41mWARNING:\x1B[47m This system version\n"
+								"doesn't support this install\n"
+								"method, only uninstalling\n"
+								"unaunch without backups will\n"
+								"be possible");
+				}
+			}
+			if(tmd)
+			{
+				fclose(tmd);
 			}
 			// HWINFO_S may not always exist (PRE_IMPORT). Fill in defaults if that happens.
 		}
@@ -325,7 +360,8 @@ int main(int argc, char **argv)
 		{
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL:
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP:
-				if(!unlaunchFound)
+				bool unsafeUninstall = advancedOptionsUnlocked && cursor == MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP;
+				if(!unlaunchFound || (!isLauncherVersionSupported && !unsafeUninstall))
 				{
 					break;
 				}
@@ -333,7 +369,6 @@ int main(int argc, char **argv)
 				{
 					break;
 				}
-				bool unsafeUninstall = advancedOptionsUnlocked && cursor == MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP;
 				printf("Uninstalling");
 				if(needsNocashFooterToBeWritten)
 				{
@@ -361,6 +396,10 @@ int main(int argc, char **argv)
 				break;
 
 			case MAIN_MENU_CUSTOM_BG:
+				if(!isLauncherVersionSupported)
+				{
+					break;
+				}
 				if(foundUnlaunchInstallerVersion == INVALID)
 				{
 					break;
@@ -381,18 +420,30 @@ int main(int argc, char **argv)
 				break;
 
 			case MAIN_MENU_TID_PATCHES:
+				if(!isLauncherVersionSupported)
+				{
+					break;
+				}
 				if(advancedOptionsUnlocked && (foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0)) {
 					disableAllPatches = !disableAllPatches;
 				}
 				break;
 
 			case MAIN_MENU_SOUND_SPLASH_PATCHES:
+				if(!isLauncherVersionSupported)
+				{
+					break;
+				}
 				if(foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL) {
 					enableSoundAndSplash = !enableSoundAndSplash;
 				}
 				break;
 
 			case MAIN_MENU_SAFE_UNLAUNCH_INSTALL:
+				if(!isLauncherVersionSupported)
+				{
+					break;
+				}
 				if(unlaunchFound || foundUnlaunchInstallerVersion == INVALID)
 				{
 					break;
