@@ -262,12 +262,12 @@ int main(int argc, char **argv)
 						"Installing unlaunch won't be possible.");
 		}
 	}
-
-	if(fileExists("nitro:/unlaunch-patch.bin"))
+	if (fileExists("sd:/unlaunch-patch.bin")) {
+		splashSoundBinaryPatchPath = "sd:/unlaunch-patch.bin";
+	}
+	else if(fileExists("nitro:/unlaunch-patch.bin"))
 	{
 		splashSoundBinaryPatchPath = "nitro:/unlaunch-patch.bin";
-	} else if (fileExists("sd:/unlaunch-patch.bin")) {
-		splashSoundBinaryPatchPath = "sd:/unlaunch-patch.bin";
 	}
 
 	//check for unlaunch and region
