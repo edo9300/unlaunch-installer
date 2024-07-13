@@ -273,6 +273,7 @@ int main(int argc, char **argv)
 	//check for unlaunch and region
 	u8 region = 0xff;
 	char retailLauncherTmdPath[64];
+	char retailLauncherPath[64];
 	const char* hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd";
 	{
 		FILE* file = fopen("nand:/sys/HWINFO_S.dat", "rb");
@@ -296,7 +297,6 @@ int main(int argc, char **argv)
 			}
 			else
 			{
-				unsigned long long tmdSize = getFileSize(tmd);
 				if (tmdSize > 520)
 				{
 					unlaunchFound = true;
@@ -305,15 +305,15 @@ int main(int argc, char **argv)
 				{
 					mainTmdIsPatched = isLauncherTmdPatched(retailLauncherTmdPath);
 				}
-				fseek(tmd, 0x1E4, SEEK_SET);
-				unsigned int contentId;
-				fread(&contentId, sizeof(contentId), 1, tmd);
+				fseek(tmd, 0x1DC, SEEK_SET);
+				unsigned short launcherVersion;
+				fread(&launcherVersion, sizeof(launcherVersion), 1, tmd);
 				// Launcher v4, build v1024 (shipped with firmware 1.4.2 (not sure about J, and 1.4.3 for china)
 				// will fail to launch if another tmd withouth appropriate application, or an invalid
 				// tmd (in our case the one installed from unlaunch) is found in the HNAA launcher folder
 				// there's really no workaround to that, so that specific version is blacklisted and only uninstalling
 				// an "officially" installed unlaunch without leaving any backup behind will be allowed
-				if(contentId == 0x04000000)
+				if(launcherVersion == 4)
 				{
 					isLauncherVersionSupported = false;
 					messageBox("\x1B[41mWARNING:\x1B[47m This system version\n"
@@ -322,6 +322,18 @@ int main(int argc, char **argv)
 								"unaunch without backups will\n"
 								"be possible");
 				}
+				else if (launcherVersion > 7)
+				{
+					char messageBoxError[128];
+					sprintf(messageBoxError, "\x1B[41mWARNING:\x1B[47m This system version (%d)\n"
+								"is unknown\n"
+								"nothing will be done", (int)launcherVersion);
+					messageBox("\x1B[41mWARNING:\x1B[47m This system version\n"
+								"is unknown\n"
+								"nothing will be done");
+					goto abort;
+				}
+				sprintf(retailLauncherPath, "nand:/title/00030017/%08lx/content/0000000%d.app", launcherTid, (int)launcherVersion);
 			}
 			if(tmd)
 			{
@@ -381,7 +393,7 @@ int main(int argc, char **argv)
 					}
 					needsNocashFooterToBeWritten = false;
 				}
-				if(uninstallUnlaunch(retailConsole, hnaaUnlaunchFound, retailLauncherTmdPath, unsafeUninstall))
+				if(uninstallUnlaunch(retailConsole, hnaaUnlaunchFound, retailLauncherTmdPath, retailLauncherPath, unsafeUninstall))
 				{
 					messageBox("Uninstall successful!\n");
 					unlaunchFound = false;
@@ -477,6 +489,7 @@ int main(int argc, char **argv)
 				}
 				if(installUnlaunch(retailConsole,
 									retailLauncherTmdPresentAndToBePatched ? retailLauncherTmdPath : NULL,
+									retailLauncherTmdPresentAndToBePatched ? retailLauncherPath : NULL,
 									disableAllPatches,
 									enableSoundAndSplash ? splashSoundBinaryPatchPath : NULL,
 									customBgPath))
@@ -511,6 +524,8 @@ int main(int argc, char **argv)
 				break;
 		}
 	}
+	
+	abort:
 
 	clearScreen(&bottomScreen);
 	printf("Unmounting NAND...\n");

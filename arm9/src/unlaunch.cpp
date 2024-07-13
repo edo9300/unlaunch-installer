@@ -225,11 +225,11 @@ static bool restoreProtoTmd(const char* path)
 	return true;
 }
 
-bool uninstallUnlaunch(bool retailConsole, bool hasHNAABackup, const char* retailLauncherTmdPath, bool removeHNAABackup)
+bool uninstallUnlaunch(bool retailConsole, bool hasHNAABackup, const char* retailLauncherTmdPath, const char* retailLauncherPath, bool removeHNAABackup)
 {
 	// TODO: handle retailLauncherTmdPresentAndToBePatched = false on retail consoles
 	if (retailConsole) {
-		if (!toggleFileReadOnly(retailLauncherTmdPath, false))
+		if (!toggleFileReadOnly(retailLauncherTmdPath, false) || !toggleFileReadOnly(retailLauncherPath, false))
 		{
 			return false;
 		}			
@@ -312,7 +312,7 @@ static bool writeUnlaunchToHNAAFolder()
 	return true;
 }
 
-static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath)
+static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath, const char* retailLauncherPath)
 {
 	if(!writeUnlaunchToHNAAFolder())
 		return false;
@@ -328,7 +328,7 @@ static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath)
 			removeHnaaLauncher();
 			return false;
 		}
-		if (!toggleFileReadOnly(retailLauncherTmdPath, true))
+		if (!toggleFileReadOnly(retailLauncherTmdPath, true) || !toggleFileReadOnly(retailLauncherPath, true))
 		{
 			messageBox("\x1B[31mError:\x1B[33m Failed to mark default launcher's title.tmd\nas read only, install might be unstable\n");
 		}
@@ -569,7 +569,7 @@ const char* getUnlaunchVersionString(UNLAUNCH_VERSION version)
 	return unlaunchVersionStrings[version];
 }
 
-bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath)
+bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, const char* retailLauncherPath, bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath)
 {
 	if (installerVersion == INVALID || !patchUnlaunchInstaller(disableAllPatches, splashSoundBinaryPatchPath, customBackgroundPath))
 		return false;
@@ -580,5 +580,5 @@ bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, bool
 		return installUnlaunchProtoConsole();
 	}
 	// Do things normally for production units
-	return installUnlaunchRetailConsole(retailLauncherTmdPath);
+	return installUnlaunchRetailConsole(retailLauncherTmdPath, retailLauncherPath);
 }
