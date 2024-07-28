@@ -226,3 +226,32 @@ bool removeIfExists(const char* path)
 {
 	return remove(path) == 0 || errno == ENOENT;
 }
+
+// Filesystem type
+typedef enum {FS_UNKNOWN, FS_FAT12, FS_FAT16, FS_FAT32} FS_TYPE;
+//trimmed down PARTITION struct from libfat internals
+typedef struct {
+	const void* disc;
+	void*                cache;
+	// Info about the partition
+	FS_TYPE               filesysType;
+	uint64_t              totalSize;
+	sec_t                 rootDirStart;
+	uint32_t              rootDirCluster;
+	uint32_t              numberOfSectors;
+	sec_t                 dataStart;
+	uint32_t              bytesPerSector;
+	uint32_t              sectorsPerCluster;
+	uint32_t              bytesPerCluster;
+	uint32_t              fsInfoSector;
+} PARTITION;
+
+extern PARTITION* _FAT_partition_getPartitionFromPath(const char* path);
+
+u32 getClusterSizeForPartition(const char* path)
+{
+	PARTITION* p = _FAT_partition_getPartitionFromPath(path);
+	if(!p)
+		return 0;
+	return p->bytesPerCluster;
+}

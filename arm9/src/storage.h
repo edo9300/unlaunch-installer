@@ -25,6 +25,8 @@ bool safeCreateDir(const char* path);
 //Files and directories
 bool removeIfExists(const char* path);
 
+u32 getClusterSizeForPartition(const char* path);
+
 #ifdef __cplusplus
 }
 #endif

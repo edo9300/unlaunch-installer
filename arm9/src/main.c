@@ -200,6 +200,13 @@ int main(int argc, char **argv)
 		messageBox("fatInitDefault()...\x1B[31mFailed\n\x1B[47m");
 	}
 
+	u32 clusterSize = getClusterSizeForPartition("sd:/");
+	if(clusterSize > 32768)
+	{
+		messageBox("Sd card cluster size is too large");
+		return 0;
+	}
+
 	//setup nand access
 	if (!fatMountSimple("nand", &io_dsi_nand))
 	{
