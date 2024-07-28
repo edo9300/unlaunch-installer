@@ -2,6 +2,7 @@
 #include "main.h"
 #include "menu.h"
 
+#include <algorithm>
 #include <nds.h>
 #include <dirent.h>
 #include <string>
@@ -11,19 +12,28 @@ static const auto& getBackgroundList()
 {
 	static auto bgs = []{
 		std::vector<std::pair<std::string,std::string>> bgs;
-		static const std::string bgstr{"nitro:/backgrounds/"};
-		auto* pdir = opendir("nitro:/backgrounds");
-		if(!pdir) return bgs;
-		dirent* pent;
-		while((pent = readdir(pdir))) {
-			if(pent->d_type == DT_DIR)
-				continue;
-			std::string name{pent->d_name};
-			if(!name.ends_with(".gif") && !name.ends_with(".GIF"))
-				continue;
-			bgs.emplace_back(name.substr(0, name.size() - 4), bgstr + name);
+		
+		for(const auto* bgstr : {"nitro:/backgrounds/", "sd:/backgrounds/"}) {
+			auto* pdir = opendir(bgstr);
+			if(!pdir) continue;
+			dirent* pent;
+			while((pent = readdir(pdir))) {
+				if(pent->d_type == DT_DIR)
+					continue;
+				std::string name{pent->d_name};
+				if(!name.ends_with(".gif") && !name.ends_with(".GIF"))
+					continue;
+				bgs.emplace_back(name.substr(0, name.size() - 4), bgstr + name);
+			}
+			closedir(pdir);
 		}
-		closedir(pdir);
+		std::sort(bgs.begin(), bgs.end(), [](const auto& lhs, const auto& rhs){
+			const auto& [lhs_name, lhs_fullpath] = lhs;
+			const auto& [rhs_name, rhs_fullpath] = rhs;
+			if(lhs_fullpath[0] != rhs_fullpath[0])
+				return lhs_fullpath[0] < rhs_fullpath[0];
+			return lhs_name < rhs_name;
+		});
 		return bgs;
 	}();
 	return bgs;
