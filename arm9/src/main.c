@@ -379,8 +379,12 @@ int main(int argc, char **argv)
 		{
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL:
 			case MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP:
-				bool unsafeUninstall = (advancedOptionsUnlocked || !isLauncherVersionSupported) && cursor == MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP;
-				if(!unlaunchFound || !unsafeUninstall)
+				if(!unlaunchFound)
+				{
+					break;
+				}
+				bool unsafeUninstall = advancedOptionsUnlocked && cursor == MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP;
+				if(!isLauncherVersionSupported && !unsafeUninstall)
 				{
 					break;
 				}
