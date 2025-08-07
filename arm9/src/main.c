@@ -315,7 +315,7 @@ int main(int argc, char **argv)
 				fseek(tmd, 0x1DC, SEEK_SET);
 				unsigned short launcherVersion;
 				fread(&launcherVersion, sizeof(launcherVersion), 1, tmd);
-				// Launcher v4, build v1024 (shipped with firmware 1.4.2 (not sure about J, and 1.4.3 for china)
+				// Launcher v4, build v1024 (shipped with firmware 1.4.2 (1.4.3 for china and korea)
 				// will fail to launch if another tmd withouth appropriate application, or an invalid
 				// tmd (in our case the one installed from unlaunch) is found in the HNAA launcher folder
 				// there's really no workaround to that, so that specific version is blacklisted and only uninstalling
@@ -374,6 +374,8 @@ int main(int argc, char **argv)
 	while (!programEnd)
 	{
 		cursor = mainMenu(cursor);
+		if(programEnd)
+			break;
 
 		switch (cursor)
 		{
