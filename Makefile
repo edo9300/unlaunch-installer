@@ -53,6 +53,7 @@ $(TARGET).dsi	: $(NITRO_FILES) arm7/$(TARGET).elf arm9/$(TARGET).elf
 			-g "$(GAME_CODE)" "00" "$(GAME_LABEL)" \
 			-b $(GAME_ICON) "$(GAME_TITLE);$(GAME_SUBTITLE1)" \
 			$(_ADDFILES)
+	cp $(TARGET).dsi ntrboot.nds
 
 #---------------------------------------------------------------------------------
 arm7/$(TARGET).elf:
@@ -66,4 +67,4 @@ arm9/$(TARGET).elf:
 clean:
 	$(MAKE) -C arm9 clean
 	$(MAKE) -C arm7 clean
-	rm -f $(TARGET).dsi $(TARGET).arm7 $(TARGET).arm9
+	rm -f $(TARGET).dsi $(TARGET).arm7 $(TARGET).arm9 ntrboot.nds

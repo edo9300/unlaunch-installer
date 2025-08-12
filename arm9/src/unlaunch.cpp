@@ -8,6 +8,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <memory>
+#include <format>
 
 static char unlaunchInstallerBuffer[0x30000];
 static char ogUnlaunchInstallerBuffer[0x30000];
@@ -51,23 +53,9 @@ bool isValidUnlaunchInstallerSize(size_t size)
 	return size == 163320 /*1.8*/ || size == 196088 /*1.9, 2.0*/;
 }
 
-bool isLauncherTmdPatched(const char* path)
-{
-	FILE* launcherTmd = fopen(path, "rb");
-	if(!launcherTmd)
-	{
-		return false;
-	}
-	fseek(launcherTmd, 0x190, SEEK_SET);
-	char c;
-	fread(&c, 1, 1, launcherTmd);
-	fclose(launcherTmd);
-	return c == 0x47;
-}
-
 static bool removeHnaaLauncher()
 {
-	auto* errString = [] -> const char* {
+    auto* errString = [] -> const char* {
 		if(!toggleFileReadOnly(hnaaTmdPath, false))
 		{
 			return "\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n";
@@ -94,92 +82,85 @@ static bool removeHnaaLauncher()
 	return true;
 }
 
-static bool restoreMainTmd(const char* path, bool hasHNAABackup, bool removeHNAABackup)
+static bool restoreMainTmd(const consoleInfo& info, bool removeHNAABackup)
 {
-	FILE* launcherTmd = fopen(path, "r+b");
-	if(!launcherTmd)
+    std::shared_ptr<FILE> launcherTmdSptr{fopen(info.launcherTmdPath.data(), "r+b"), fclose};
+    if(!launcherTmdSptr)
 	{
 		messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
 		return false;
 	}
-	// Set back the title.tmd's title id from GNXX to HNXX
-	fseek(launcherTmd, 0x190, SEEK_SET);
-	char c;
-	fread(&c, 1, 1, launcherTmd);
-	//if byte is not what we expect, the install method was different
-	if(c == 0x47)
-	{
-		fseek(launcherTmd, -1, SEEK_CUR);
-		c = 0x48;
-		fwrite(&c, 1, 1, launcherTmd);
-		fclose(launcherTmd);
-		if(removeHNAABackup && hasHNAABackup)
-		{
-			removeHnaaLauncher();
-		}
-	}
-	else if(c != 0x47)
-	{
-		if (getFileSize(launcherTmd) > 520) {
-			// Remove unlaunch if it already exists on the main launcher tmd.
-			// If we don't do this and unlaunch is on the tmd, it will take over and prevent loading HNAA
+    FILE* launcherTmd = launcherTmdSptr.get();
 
-			// This is also a good idea to make sure the tmd is 520b.
-			// You will have a much higher brick risk if something goes wrong with a tmd over 520b.
-			// See: http://docs.randommeaninglesscharacters.com/unlaunch.html
-			if(!hasHNAABackup && !removeHNAABackup)
-			{
-				auto choiceString = [&]{
-					if(installerVersion != INVALID)
-						return "Unlaunch was installed with the\n"
-								"legacy method.\n"
-								"Before uninstalling it, a\n"
-								"failsafe installation will be\n"
-								"created.\n"
-								"Proceed?";
-					return "Unlaunch was installed with the\n"
-							"legacy method\n"
-							"But a failsafe installation\n"
-							"cannot be created since no valid\n"
-							"unlaunch installer was provided.\n"
-							"Proceed anyways?";
-				}();
-				if(choiceBox(choiceString) == NO)
-				{
-					fclose(launcherTmd);
-					return false;
-				}
-				if(installerVersion != INVALID)
-				{
-					if(!writeUnlaunchToHNAAFolder())
-					{
-						if(choiceBox("Failsafe installation couldn't\n"
-										"be copmleted.\n"
-										"Proceed anyways?") == NO)
-						{
-							fclose(launcherTmd);
-							return false;
-						}
-					}
-				}
-			}
-			if(removeHNAABackup && hasHNAABackup)
-			{
-				removeHnaaLauncher();
-			}
-			if (ftruncate(fileno(launcherTmd), 520) != 0) {
-				messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
-	   			fclose(launcherTmd);
-	   			return false;
-   			}
-   			fclose(launcherTmd);
-	   		return true;
-		}
-		messageBox("\x1B[31mError:\x1B[33m Unlaunch was installed with an\nunknown method\naborting\n");
-		fclose(launcherTmd);
-		return false;
-	}
-	return true;
+    // If the tmd is patched, assume the HNAA backup is already set in place.
+    if(info.tmdPatched) {
+        fseek(launcherTmd, 0x190, SEEK_SET);
+        // Set back the title.tmd's title id from GNXX to HNXX
+        char c = 0x48;
+        fwrite(&c, 1, 1, launcherTmd);
+        fflush(launcherTmd);
+    } else if(!info.tmdGood || info.tmdInvalid) {
+        // The tmd isn't good, it either has the wrong size, or the hash didn't match
+        // and it wasn't patched with the new method
+        // Install the hnaa backup if not found and then truncate the tmd to 520b
+        // before restoring it
+        if(!info.UnlaunchHNAAtmdFound && !removeHNAABackup)
+        {
+            auto choiceString = [&]{
+                if(installerVersion != INVALID)
+                    return "Unlaunch was installed with the\n"
+                            "legacy method.\n"
+                            "Before uninstalling it, a\n"
+                            "failsafe installation will be\n"
+                            "created.\n"
+                            "Proceed?";
+                return "Unlaunch was installed with the\n"
+                        "legacy method\n"
+                        "But a failsafe installation\n"
+                        "cannot be created since no valid\n"
+                        "unlaunch installer was provided.\n"
+                        "Proceed anyways?";
+            }();
+            if(choiceBox(choiceString) == NO)
+            {
+                return false;
+            }
+            if(installerVersion != INVALID)
+            {
+                if(!writeUnlaunchToHNAAFolder())
+                {
+                    if(choiceBox("Failsafe installation couldn't\n"
+                                    "be copmleted.\n"
+                                    "Proceed anyways?") == NO)
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        if (ftruncate(fileno(launcherTmd), 520) != 0) {
+            messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
+            return false;
+        }
+    }
+
+    Sha1Digest digest;
+    calculateFileSha1(launcherTmd, &digest);
+
+    // the tmd still doesn't match, write a known good one
+    if(digest != info.recoveryTmdDataSha) {
+        fseek(launcherTmd, 0, SEEK_SET);
+        auto written = fwrite(info.recoveryTmdData.data(), info.recoveryTmdData.size(), 1, launcherTmd);
+        if(written != 1) {
+            messageBox("\x1B[31mError:\x1B[33m Failed to remove unlaunch\n");
+            return false;
+        }
+    }
+    if(removeHNAABackup && info.UnlaunchHNAAtmdFound)
+    {
+        return removeHnaaLauncher();
+    }
+    return true;
 }
 
 static bool patchMainTmd(const char* path)
@@ -225,15 +206,21 @@ static bool restoreProtoTmd(const char* path)
 	return true;
 }
 
-bool uninstallUnlaunch(bool retailConsole, bool hasHNAABackup, const char* retailLauncherTmdPath, const char* retailLauncherPath, bool removeHNAABackup)
+bool uninstallUnlaunch(const consoleInfo& info, bool removeHNAABackup)
 {
 	// TODO: handle retailLauncherTmdPresentAndToBePatched = false on retail consoles
-	if (retailConsole) {
-		if (!toggleFileReadOnly(retailLauncherTmdPath, false) || !toggleFileReadOnly(retailLauncherPath, false))
+    if (info.isRetail) {
+        if(!toggleFileReadOnly(info.launcherTmdPath.data(), false))
+        {
+            messageBox(std::format("\x1B[31mError:\x1B[33m Failed to make {} writable\n", info.launcherTmdPath).data());
+            return false;
+        }
+        if(!toggleFileReadOnly(info.launcherAppPath.data(), false))
 		{
+            messageBox(std::format("\x1B[31mError:\x1B[33m Failed to make {} writable\n", info.launcherAppPath).data());
 			return false;
-		}			
-		if (!restoreMainTmd(retailLauncherTmdPath, hasHNAABackup, removeHNAABackup))
+        }
+        if (!restoreMainTmd(info, removeHNAABackup))
 		{
 			return false;
 		}
@@ -312,7 +299,7 @@ static bool writeUnlaunchToHNAAFolder()
 	return true;
 }
 
-static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath, const char* retailLauncherPath)
+static bool installUnlaunchRetailConsole(const consoleInfo& info)
 {
 	if(!writeUnlaunchToHNAAFolder())
 		return false;
@@ -320,20 +307,20 @@ static bool installUnlaunchRetailConsole(const char* retailLauncherTmdPath, cons
 	//Finally patch the default launcher tmd to be invalid
 	//If there isn't a title.tmd matching the language region in the hwinfo
 	// nothing else has to be done, could be a language patch, or a dev system, the user will know what they have done
-	if (retailLauncherTmdPath)
-	{
-		// Set tmd as writable in case unlaunch was already installed through the old method
-		if(!toggleFileReadOnly(retailLauncherTmdPath, false) || !patchMainTmd(retailLauncherTmdPath))
-		{
-			removeHnaaLauncher();
-			return false;
-		}
-		if (!toggleFileReadOnly(retailLauncherTmdPath, true) || !toggleFileReadOnly(retailLauncherPath, true))
-		{
-			messageBox("\x1B[31mError:\x1B[33m Failed to mark default launcher's title.tmd\nas read only, install might be unstable\n");
-		}
-	}
-	return true;
+    if (!info.tmdFound)
+        return true;
+
+    // Set tmd as writable in case unlaunch was already installed through the old method
+    if(!toggleFileReadOnly(info.launcherTmdPath.data(), false) || !patchMainTmd(info.launcherTmdPath.data()))
+    {
+        removeHnaaLauncher();
+        return false;
+    }
+    if (!toggleFileReadOnly(info.launcherTmdPath.data(), true) || !toggleFileReadOnly(info.launcherAppPath.data(), true))
+    {
+        messageBox("\x1B[31mError:\x1B[33m Failed to mark default launcher's title.tmd\nas read only, install might be unstable\n");
+    }
+    return true;
 }
 
 static bool installUnlaunchProtoConsole(void)
@@ -381,9 +368,9 @@ static bool installUnlaunchProtoConsole(void)
 	return true;
 }
 
-static bool readUnlaunchInstaller(const char* path)
+static bool readUnlaunchInstaller(std::string_view path)
 {
-	FILE* unlaunchInstaller = fopen(path, "rb");
+    FILE* unlaunchInstaller = fopen(path.data(), "rb");
 	if (!unlaunchInstaller)
 	{
 		messageBox("\x1B[31mError:\x1B[33m Failed to open unlaunch installer\n");
@@ -545,7 +532,7 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSou
 	return true;
 }
 
-UNLAUNCH_VERSION loadUnlaunchInstaller(const char* path)
+UNLAUNCH_VERSION loadUnlaunchInstaller(std::string_view path)
 {
 	if(readUnlaunchInstaller(path) && verifyUnlaunchInstaller())
 	{
@@ -569,16 +556,16 @@ const char* getUnlaunchVersionString(UNLAUNCH_VERSION version)
 	return unlaunchVersionStrings[version];
 }
 
-bool installUnlaunch(bool retailConsole, const char* retailLauncherTmdPath, const char* retailLauncherPath, bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath)
+bool installUnlaunch(const consoleInfo& info, bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath)
 {
 	if (installerVersion == INVALID || !patchUnlaunchInstaller(disableAllPatches, splashSoundBinaryPatchPath, customBackgroundPath))
 		return false;
 
 	// Treat protos differently
-	if (!retailConsole)
+    if (!info.isRetail)
 	{
 		return installUnlaunchProtoConsole();
 	}
 	// Do things normally for production units
-	return installUnlaunchRetailConsole(retailLauncherTmdPath, retailLauncherPath);
+    return installUnlaunchRetailConsole(info);
 }

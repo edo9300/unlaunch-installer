@@ -31,7 +31,7 @@ CFLAGS	:=	-g -Wall -O2\
 			$(ARCH)
 
 CFLAGS	+=	$(INCLUDE) -DARM9
-CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
+CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fexceptions -std=gnu++23 -Wno-psabi 
 
 ASFLAGS	:=	-g $(ARCH) -march=armv5te -mtune=arm946e-s
 
