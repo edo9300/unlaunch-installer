@@ -22,6 +22,12 @@ struct consoleInfo {
     std::array<uint8_t, 520> recoveryTmdData;
     Sha1Digest recoveryTmdDataSha;
     NocashFooter nocashFooter;
+    bool isStockTmd() const {
+        if(!isRetail) {
+            return !UnlaunchHNAAtmdFound;
+        }
+        return tmdGood;
+    }
 };
 
 #endif

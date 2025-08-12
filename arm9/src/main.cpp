@@ -105,18 +105,18 @@ static int mainMenu(const consoleInfo& info, int cursor)
 	{
 		strcpy(installUnlaunchStr, "Install unlaunch");
 	}
-    addMenuItem(m, restore_string, NULL, (info.tmdInvalid || info.tmdPatched) && isLauncherVersionSupported, false);
+    addMenuItem(m, restore_string, NULL, !info.isStockTmd() && isLauncherVersionSupported, false);
 	addMenuItem(m, "Custom background", NULL, foundUnlaunchInstallerVersion != INVALID && isLauncherVersionSupported, true);
 	addMenuItem(m, soundPatchesStr, NULL, foundUnlaunchInstallerVersion == v2_0 && !disableAllPatches && splashSoundBinaryPatchPath != NULL && isLauncherVersionSupported, false);
-    addMenuItem(m, installUnlaunchStr, NULL, foundUnlaunchInstallerVersion != INVALID && !(info.tmdInvalid || info.tmdPatched) && isLauncherVersionSupported, false);
+    addMenuItem(m, installUnlaunchStr, NULL, foundUnlaunchInstallerVersion != INVALID && info.isStockTmd() && isLauncherVersionSupported, false);
 	addMenuItem(m, "Exit", NULL, true, false);
 	if(!isLauncherVersionSupported)
     {
-        addMenuItem(m, restore_string_no_backup, NULL, (info.tmdInvalid || info.tmdPatched), false);
+        addMenuItem(m, restore_string_no_backup, NULL, !info.isStockTmd(), false);
 	}
 	else if(advancedOptionsUnlocked)
     {
-        addMenuItem(m, restore_string_no_backup, NULL, (info.tmdInvalid || info.tmdPatched), false);
+        addMenuItem(m, restore_string_no_backup, NULL, !info.isStockTmd(), false);
         addMenuItem(m, "Write nocash footer", NULL, info.needsNocashFooterToBeWritten, false);
         addMenuItem(m, tidPatchesStr, NULL, tidPatchesSupported, false);
 	}
@@ -163,7 +163,7 @@ static int mainMenu(const consoleInfo& info, int cursor)
 			// Enabled by default when unsupported
 			if(isLauncherVersionSupported)
 			{
-                addMenuItem(m, "Uninstall unlaunch no backup", NULL, (info.tmdInvalid || info.tmdPatched), false);
+                addMenuItem(m, "Uninstall unlaunch no backup", NULL, !info.isStockTmd(), false);
 			}
             addMenuItem(m, "Write nocash footer", NULL, info.needsNocashFooterToBeWritten, false);
             addMenuItem(m, tidPatchesStr, NULL, tidPatchesSupported, false);
@@ -470,7 +470,7 @@ void retrieveInstalledLauncherInfo(consoleInfo& info) {
 }
 
 void uninstall(consoleInfo& info, bool noBackup) {
-    if(!(info.tmdInvalid || info.tmdPatched))
+    if(info.isStockTmd())
     {
         return;
     }
@@ -510,7 +510,11 @@ void install(consoleInfo& info) {
     {
         return;
     }
-    if(info.tmdInvalid || info.tmdPatched || !info.tmdGood || foundUnlaunchInstallerVersion == INVALID)
+    if(!info.isStockTmd())
+    {
+        return;
+    }
+    if(foundUnlaunchInstallerVersion == INVALID)
     {
         return;
     }
