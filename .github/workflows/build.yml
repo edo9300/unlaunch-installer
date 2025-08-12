@@ -25,7 +25,9 @@ jobs:
       - name: Publish build to GH Actions
         uses: actions/upload-artifact@v4
         with:
-          path: "*.dsi"
+          path: |
+            *.dsi
+            *.nds
           name: build
 
   # Only run this for non-PR jobs.
