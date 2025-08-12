@@ -207,8 +207,13 @@ void setup() {
     u32 clusterSize = getClusterSizeForPartition("sd:/");
     if(clusterSize > 32768)
     {
-        messageBox("Sd card cluster size is too large");
-        exit(0);
+        messageBox(std::format("\x1B[41mWARNING:\x1B[47m This SD card cluster\n"
+                               "size is currently {}KB,\n"
+                               "which is too large for Unlaunch\n"
+                               "to work.\n"
+                               "If you install it, Unlaunch\n"
+                               "won't boot as long as this SD\n"
+                               "card is inserted.", clusterSize / 1024).data());
     }
 
     //setup nand access
