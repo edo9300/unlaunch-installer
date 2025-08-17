@@ -90,7 +90,7 @@ static void setupScreens()
 
 static int mainMenu(const consoleInfo& info, int cursor)
 {
-    const auto tidPatchesSupported = (foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0) && isLauncherVersionSupported;
+    const auto tidPatchesSupported = (foundUnlaunchInstallerVersion == v2_0) && isLauncherVersionSupported;
 	//top screen
 	clearScreen(&topScreen);
 
@@ -352,12 +352,13 @@ void loadUnlaunchInstaller() {
 }
 
 void loadUnlaunchInstallerPatch() {
-    if (fileExists("sd:/unlaunch-patch.bin")) {
-        splashSoundBinaryPatchPath = "sd:/unlaunch-patch.bin";
+    if (fileExists("sd:/sound-and-splash-patch.bin")) {
+        splashSoundBinaryPatchPath = "sd:/sound-and-splash-patch.bin";
+    } else if(fileExists("nitro:/sound-and-splash-patch.bin")) {
+        splashSoundBinaryPatchPath = "nitro:/sound-and-splash-patch.bin";
     }
-    else if(fileExists("nitro:/unlaunch-patch.bin"))
-    {
-        splashSoundBinaryPatchPath = "nitro:/unlaunch-patch.bin";
+    if(!fileExists("nitro:/force-hnaa-patch.bin")) {
+        throw std::runtime_error(std::format("Failed to find hnaa patch ({})", "nitro:/force-hnaa-patch.bin"));
     }
 }
 
@@ -657,7 +658,7 @@ void doMainMenu(consoleInfo& info) {
             {
                 break;
             }
-            if(advancedOptionsUnlocked && (foundUnlaunchInstallerVersion == v1_9 || foundUnlaunchInstallerVersion == v2_0)) {
+            if(advancedOptionsUnlocked && (foundUnlaunchInstallerVersion == v2_0)) {
                 disableAllPatches = !disableAllPatches;
             }
             break;
@@ -700,11 +701,12 @@ int main(int argc, char **argv)
     }
 
     loadUnlaunchInstaller();
-    loadUnlaunchInstallerPatch();
-
-    consoleInfo info;
 
     try {
+        loadUnlaunchInstallerPatch();
+
+        consoleInfo info;
+
         retrieveInstalledLauncherInfo(info);
 
         checkNocashFooter(info);

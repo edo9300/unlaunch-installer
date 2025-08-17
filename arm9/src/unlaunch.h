@@ -5,8 +5,6 @@
 #include "consoleInfo.h"
 
 typedef enum UNLAUNCH_VERSION {
-	v1_8,
-	v1_9,
 	v2_0,
 	INVALID,
 } UNLAUNCH_VERSION;

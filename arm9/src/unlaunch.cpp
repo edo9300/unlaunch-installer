@@ -30,19 +30,19 @@ constexpr std::array knownUnlaunchHashes{
 	/*"0525b28cc59b6f7fc00ad592aebadd7257bf7efb"_sha1, // v1.5: blacklisted, doesn't like this install method*/
 	/*"9470a51fde188235052b119f6bfabf6689cb2343"_sha1, // v1.6: blacklisted, doesn't like this install method*/
 	/*"672c11eb535b97b0d32ff580d314a2ad6411d5fe"_sha1, // v1.7: blacklisted, doesn't like this install method*/
-	"b76c2b1722e769c6c0b4b3d4bc73250e41993229"_sha1, // v1.8
-	"f3eb41cba136a3477523155f8b05df14917c55f4"_sha1, // v1.9
+    /*"b76c2b1722e769c6c0b4b3d4bc73250e41993229"_sha1, // v1.8: blacklisted, the HNAA patch is only done for 2.0 */
+    /*"f3eb41cba136a3477523155f8b05df14917c55f4"_sha1, // v1.9: blacklisted, the HNAA patch is only done for 2.0 */
 	"15f4a36251d1408d71114019b2825fe8f5b4c8cc"_sha1, // v2.0
 };
 
 constexpr std::array gifOffsets{
-	std::make_pair(0x48d4, 0x8540), /* 1.8 */
-	std::make_pair(0x48c8, 0x8534), /* 1.9 */
+    /* std::make_pair(0x48d4, 0x8540),*/ /* 1.8 */
+    /* std::make_pair(0x48c8, 0x8534),*/ /* 1.9 */
 	std::make_pair(0x48f0, 0x855c), /* 2.0 */
 };
 
 constexpr std::array blockAllPatchesOffset{
-	0xae74, /* 1.9 */
+    /* 0xae74, */ /* 1.9 */
 	0xae91, /* 2.0 */
 };
 
@@ -476,55 +476,56 @@ static bool patchCustomBackground(const char* customBackgroundPath)
 	return true;
 }
 
+static bool applyBinaryPatch(const char* path)
+{
+    static constexpr auto lzssCompressedBinaryOffset = 0x8580;
+    static constexpr auto lzssCompressedBinarySize = 0x67FD;
+    auto* patch = fopen(path, "rb");
+    if(!patch)
+    {
+        messageBox("\x1B[31mError:\x1B[33m Failed to open the patch.\n");
+        return false;
+    }
+    auto patchSize = getFileSize(patch);
+    if(patchSize > lzssCompressedBinarySize)
+    {
+        messageBox("\x1B[31mError:\x1B[33m Patch is too big.\n");
+        fclose(patch);
+        return false;
+    }
+    if (fread((unlaunchInstallerBuffer + 520) + lzssCompressedBinaryOffset, 1, patchSize, patch) != patchSize)
+    {
+        messageBox("\x1B[31mError:\x1B[33m Failed to read patch.\n");
+        fclose(patch);
+        return false;
+    }
+    fclose(patch);
+    return true;
+}
+
 static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath)
 {
 	tonccpy(unlaunchInstallerBuffer, ogUnlaunchInstallerBuffer, sizeof(unlaunchInstallerBuffer));
-	if(disableAllPatches)
-	{
-		if(installerVersion == v1_8)
-		{
-			messageBox("\x1B[31mError:\x1B[33m Unlaunch 1.8 can't be patched\n");
-			return false;
-		}
-		// change launcher TID from ANH to SAN so that unlaunch doesn't realize it's booting the launcher
-		auto patchOffset = blockAllPatchesOffset[installerVersion - 1];
-		const char newID[]{'S','A','N'};
-		memcpy((unlaunchInstallerBuffer + 520) + patchOffset, newID, 3);
-	}
-	else if (splashSoundBinaryPatchPath)
-	{
-		if(installerVersion != v2_0)
-		{
-			messageBox("\x1B[31mError:\x1B[33m The splash and sound patch is\n"
-						"only for unlaunch 2.0\n");
-			return false;
-		}
-		static constexpr auto patchOffset = 0x8580;
-		static constexpr auto patchSectionSize = 0x67FD;
-		auto* patch = fopen(splashSoundBinaryPatchPath, "rb");
-		if(!patch)
-		{
-			messageBox("\x1B[31mError:\x1B[33m Failed to open the splash and\n"
-						"sound patch is.\n");
-			return false;
-		}
-		auto patchSize = getFileSize(patch);
-		if(patchSize > patchSectionSize)
-		{
-			messageBox("\x1B[31mError:\x1B[33m Splash and sound patch is too\n"
-						"big.\n");
-			fclose(patch);
-			return false;
-		}
-		if (fread((unlaunchInstallerBuffer + 520) + patchOffset, 1, patchSize, patch) != patchSize)
-		{
-			messageBox("\x1B[31mError:\x1B[33m Failed to read splash and sound\n"
-						"patch.\n");
-			fclose(patch);
-			return false;
-		}
-		fclose(patch);
-	}
+    if (splashSoundBinaryPatchPath)
+    {
+        iprintf("Applying splash and sound patch\n");
+        if(!applyBinaryPatch(splashSoundBinaryPatchPath))
+        {
+            return false;
+        }
+    } else {
+        if(disableAllPatches) {
+            // change launcher TID from ANH to SAN so that unlaunch doesn't realize it's booting the launcher
+            auto patchOffset = blockAllPatchesOffset[installerVersion];
+            const char newID[]{'S','A','N'};
+            memcpy((unlaunchInstallerBuffer + 520) + patchOffset, newID, 3);
+        }
+        iprintf("Applying HNAA patch\n");
+        if(!applyBinaryPatch("nitro:/force-hnaa-patch.bin"))
+        {
+            return false;
+        }
+    }
 	if(!patchCustomBackground(customBackgroundPath))
 	{
 		return false;
@@ -543,8 +544,6 @@ UNLAUNCH_VERSION loadUnlaunchInstaller(std::string_view path)
 }
 
 std::array unlaunchVersionStrings{
-	"v1.8",
-	"v1.9",
 	"v2.0",
 	"INVALID",
 };
