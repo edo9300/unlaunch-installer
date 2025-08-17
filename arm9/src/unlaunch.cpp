@@ -235,14 +235,16 @@ bool uninstallUnlaunch(const consoleInfo& info, bool removeHNAABackup)
 
 static bool writeUnlaunchTmd(const char* path)
 {
-	Sha1Digest expectedDigest, actualDigest;
-	swiSHA1Calc(expectedDigest.data(), unlaunchInstallerBuffer, unlaunchInstallerSize + 520);
-	if(calculateFileSha1Path(path, actualDigest.data()) && expectedDigest == actualDigest)
+    static constexpr auto unlaunchShaOffset = 0x4000;
+    Sha1Digest expectedDigest, actualDigest;
+    swiSHA1Calc(expectedDigest.data(), unlaunchInstallerBuffer + unlaunchShaOffset,
+                (unlaunchInstallerSize + 520) - unlaunchShaOffset);
+    if(calculateFileSha1PathOffset(path, actualDigest.data(), unlaunchShaOffset) && expectedDigest == actualDigest)
 	{
 		// the tmd hasn't changed, no need to do anything
 		return true;
 	}
-	
+
 	FILE* targetTmd = fopen(path, "wb");
 	if (!targetTmd)
 	{
@@ -260,7 +262,7 @@ static bool writeUnlaunchTmd(const char* path)
 	
 	fclose(targetTmd);
 	
-	if(!calculateFileSha1Path(path, actualDigest.data()) || expectedDigest != actualDigest)
+    if(!calculateFileSha1PathOffset(path, actualDigest.data(), unlaunchShaOffset) || expectedDigest != actualDigest)
 	{
 		removeIfExists(path);
 		messageBox("\x1B[31mError:\x1B[33m Unlaunch tmd was not properly written\n");

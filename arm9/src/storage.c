@@ -176,9 +176,9 @@ bool writeToFile(FILE* fd, const char* buffer, size_t size)
 	return toWrite == 0;
 }
 
-bool calculateFileSha1(FILE* f, void* digest)
+bool calculateFileSha1Offset(FILE* f, void* digest, size_t offset)
 {
-	fseek(f, 0, SEEK_SET);
+	fseek(f, offset, SEEK_SET);
 	
 	swiSHA1context_t ctx;
 	ctx.sha_block = 0; //this is weird but it has to be done
@@ -198,14 +198,14 @@ bool calculateFileSha1(FILE* f, void* digest)
 	return true;
 }
 
-bool calculateFileSha1Path(const char* path, void* digest)
+bool calculateFileSha1PathOffset(const char* path, void* digest, size_t offset)
 {
 	FILE* targetFile = fopen(path, "rb");
 	if (!targetFile)
 	{
 		return false;
 	}	
-	bool res = calculateFileSha1(targetFile, digest);
+	bool res = calculateFileSha1Offset(targetFile, digest, offset);
 	fclose(targetFile);
 	return res;
 }
