@@ -10,6 +10,7 @@
 #include "nandio.h"
 #include "u128_math.h"
 
+#define STAGE2_HEADER_SECTOR 1
 #define NOCASH_FOOTER_SECTOR 2044
 
 /************************ Function Protoypes **********************************/
@@ -174,12 +175,12 @@ void nandio_construct_nocash_footer(NocashFooter* footer)
 
 bool nandio_read_nocash_footer(NocashFooter* footer)
 {
-	if(!nand_ReadSectors(NOCASH_FOOTER_SECTOR, 1, crypt_buf))
+	if(!nand_ReadSectors(NOCASH_FOOTER_SECTOR, 1, sector_buf))
 	{
 		return false;
 	}
 	
-	memcpy(footer, crypt_buf, sizeof(NocashFooter));
+	memcpy(footer, sector_buf, sizeof(NocashFooter));
 	return true;
 }
 
@@ -188,20 +189,29 @@ bool nandio_write_nocash_footer(NocashFooter* footer)
 	if (writingLocked)
 		return false;
 	
-	if(!nand_ReadSectors(NOCASH_FOOTER_SECTOR, 1, crypt_buf))
+	if(!nand_ReadSectors(NOCASH_FOOTER_SECTOR, 1, sector_buf))
 	{
 		return false;
 	}
 	
-	memcpy(crypt_buf, footer, sizeof(NocashFooter));
+	memcpy(sector_buf, footer, sizeof(NocashFooter));
 	
 	
-	if(!nand_WriteSectors(NOCASH_FOOTER_SECTOR, 1, crypt_buf))
+	if(!nand_WriteSectors(NOCASH_FOOTER_SECTOR, 1, sector_buf))
 	{
 		return false;
 	}
 	
 	return true;
+}
+
+void nandio_calculate_stage2_sha(void* digest)
+{
+	if(!nand_ReadSectors(STAGE2_HEADER_SECTOR, 1, sector_buf))
+	{
+		return;
+	}
+	swiSHA1Calc(digest, sector_buf, SECTOR_SIZE);
 }
 
 // len is guaranteed <= CRYPT_BUF_LEN

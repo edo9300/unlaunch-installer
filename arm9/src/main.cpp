@@ -35,6 +35,29 @@ static bool isLauncherVersionSupported = true;
 PrintConsole topScreen;
 PrintConsole bottomScreen;
 
+struct Stage2 {
+    Sha1Digest sha;
+    bool unlaunch_supported;
+};
+
+// these are SHA1 checksums of the first block of every stage 2 known so far
+// https://docs.randommeaninglesscharacters.com/stage2.html
+static constexpr std::array knownStage2s{
+    Stage2{"dd95fd20026925fbaaa5641517758e41397be27d"_sha1, true},  // v2435-8325_prod
+    Stage2{"f546ee3cb23617b39205f6eaaa127ed347c4a132"_sha1, true},  // v2435-8325_dev
+    Stage2{"8d99c1c8cf82cb672d9b3ecd587ef9eb4f4aca2d"_sha1, true},  // v2665-9336_prod
+    Stage2{"7005bb39f6e2e3d2c627079b1c2d15a9b5045801"_sha1, true},  // v2725-9336_dev
+    Stage2{"d734155da34c4789847b7e5fe8a7a84e131064e9"_sha1, false}, // SDMC_20080821-134255_dev
+    Stage2{"70c647961d5216a3801d9b48170b294a58fe3c2e"_sha1, false}, // v1935-7470_dev
+    Stage2{"fc76bd0f41f53ea8610cde197d965f5723af779a"_sha1, false}, // v1935-7470_prod
+    Stage2{"4b476c6aacb5e867c025a54ad6166e423ce81293"_sha1, false}, // v2262-8067_dev
+    Stage2{"d35d0870ddaf49f3db675a663c759f15dbfccd7e"_sha1, false}, // v2262-8067_prod
+    Stage2{"2611443b63b94d46b4c71810d84c7b93fd5bd594"_sha1, false}, // vNONE-NONE_Unknown_dev
+    Stage2{"a8b5a025378a1d0c7bbb2cf50cab6edf7b9bc312"_sha1, false}, // vNONE-NONE_Updater_dev
+    Stage2{"2611443b63b94d46b4c71810d84c7b93fd5bd594"_sha1, false}, // vNONE-NONE_X4_dev
+    Stage2{"0caa17616108b26f83bd98256ad0350f37504e75"_sha1, false}, // vNONE-NONE_X6_prod
+};
+
 enum {
 	MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL,
 	MAIN_MENU_CUSTOM_BG,
@@ -222,6 +245,27 @@ void setup() {
         messageBox("nand init \x1B[31mfailed\n\x1B[47m");
         exit(0);
     }
+}
+
+void checkStage2Supported() {
+    Sha1Digest digest;
+    nandio_calculate_stage2_sha(digest.data());
+    for(const auto& [sha, unlaunch]: knownStage2s) {
+        if(sha == digest) {
+            if(!unlaunch) {
+                messageBox("\x1B[31mError:\x1B[33m A known stage2 was found but is not compatible with\n"
+                           "unlaunch.");
+                exit(0);
+            }
+            return;
+        }
+    }
+    messageBox("\x1B[31mError:\x1B[33m An unknown stage2\n"
+               "was found. This is a rare find,\n"
+               "you should look for help\n"
+               "archiving and documenting\n"
+               "your nand");
+    exit(0);
 }
 
 void checkNocashFooter(consoleInfo& info) {
@@ -648,6 +692,7 @@ void doMainMenu(consoleInfo& info) {
 int main(int argc, char **argv)
 {
     setup();
+    checkStage2Supported();
 
     if (!nitroFSInit(getInstallerPath(argc, argv)))
     {
