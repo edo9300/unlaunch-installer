@@ -56,14 +56,16 @@ bool isValidUnlaunchInstallerSize(size_t size)
 static bool removeHnaaLauncher()
 {
     auto* errString = [] -> const char* {
-		if(!toggleFileReadOnly(hnaaTmdPath, false))
-		{
-			return "\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n";
-		}
-		if(!removeIfExists(hnaaTmdPath))
-		{
-			return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's title.tmd\n";
-		}
+        if(fileExists(hnaaTmdPath)) {
+            if(!toggleFileReadOnly(hnaaTmdPath, false))
+            {
+                return "\x1B[31mError:\x1B[33m Failed to mark unlaunch's title.tmd as writable\nLeaving as is\n";
+            }
+            if(!removeIfExists(hnaaTmdPath))
+            {
+                return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's title.tmd\n";
+            }
+        }
 		if(!removeIfExists("nand:/title/00030017/484e4141/content"))
 		{
 			return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's content folder\n";
