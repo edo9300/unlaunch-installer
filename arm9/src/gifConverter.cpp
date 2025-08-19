@@ -24,7 +24,7 @@ struct Gif {
     } __attribute__ ((__packed__)) header;
     static_assert(sizeof(Header) == 13);
 
-    std::array<uint8_t, 255 * 3> colorTable;
+    std::array<uint8_t, 256 * 3> colorTable;
     size_t numColors;
 
     struct Frame {
