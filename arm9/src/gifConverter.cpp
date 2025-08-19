@@ -92,12 +92,6 @@ Gif getGif(std::string_view path) {
         switch (fgetc(file)) {
         case 0x21: { // Extension
             switch (fgetc(file)) {
-                case 0xF9: { // Graphics Control
-                    uint8_t toRead = fgetc(file);
-                    fseek(file, toRead, SEEK_CUR);
-                    fgetc(file); // Terminator
-                    break;
-                }
                 case 0x01: { // Plain text
                     throw std::runtime_error("Plain text found");
 #if 0
@@ -108,24 +102,10 @@ Gif getGif(std::string_view path) {
                     break;
 #endif
                 }
-                case 0xFF: { // Application extension
-                    throw std::runtime_error("Application extension found");
-#if 0
-                    if (fgetc(file) == 0xB) {
-                        char buffer[0xC] = {0};
-                        fread(buffer, 1, 0xB, file);
-                        if (strcmp(buffer, "NETSCAPE2.0") == 0) { // Check for Netscape loop count
-                            fseek(file, 2, SEEK_CUR);
-                            fseek(file, 2, SEEK_CUR);
-                            fgetc(file); //terminator
-                            break;
-                        }
-                    }
-                    [[fallthrough]];
-#endif
-                }
+                case 0xF9: // Graphics Control
+                case 0xFF: // Application extension
                 case 0xFE: { // Comment
-                    // Skip comments and unsupported application extionsions
+                    // Skip
                     while (uint8_t size = fgetc(file)) {
                         fseek(file, size, SEEK_CUR);
                     }
