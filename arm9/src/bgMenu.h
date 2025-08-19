@@ -1,14 +1,9 @@
 #ifndef BGMENU_H
 #define BGMENU_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <cstdint>
+#include <span>
 
-const char* backgroundMenu();
-
-#ifdef __cplusplus
-}
-#endif
+std::span<uint8_t> backgroundMenu();
 
 #endif

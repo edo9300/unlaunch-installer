@@ -1,12 +1,18 @@
 #include "bgMenu.h"
 #include "main.h"
 #include "menu.h"
+#include "gifConverter.h"
+#include "message.h"
 
 #include <algorithm>
+#include <array>
+#include <format>
 #include <nds.h>
 #include <dirent.h>
 #include <string>
 #include <vector>
+
+static std::array<uint8_t, MAX_GIF_SIZE> currentlyLoadedGif;
 
 static const auto& getBackgroundList()
 {
@@ -39,7 +45,7 @@ static const auto& getBackgroundList()
 	return bgs;
 }
 
-const char* backgroundMenu()
+std::span<uint8_t> backgroundMenu()
 {
 	//top screen
 	clearScreen(&topScreen);
@@ -79,12 +85,17 @@ const char* backgroundMenu()
 		}
 	}
 
-	const char* result = nullptr;
-	if(static_cast<size_t>(m->cursor) < bgs.size())
-		result = bgs[m->cursor].second.data();
-	else if(static_cast<size_t>(m->cursor) == bgs.size())
-		result = "default";
+	auto selection = static_cast<size_t>(m->cursor);
 	freeMenu(m);
 
-	return result;
+	if(selection < bgs.size()) {
+		try {
+			return parseGif(bgs[selection].second.data(), currentlyLoadedGif);
+		} catch(const std::exception& e) {
+			messageBox(std::format("\x1B[31mError:\x1B[33m The image could not\n"
+								   "be loaded: {}", e.what()).data());
+		}
+	}
+
+	return {};
 }

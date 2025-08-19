@@ -26,7 +26,7 @@ static UNLAUNCH_VERSION foundUnlaunchInstallerVersion = INVALID;
 static bool disableAllPatches = false;
 static bool enableSoundAndSplash = false;
 static const char* splashSoundBinaryPatchPath = NULL;
-static const char* customBgPath = NULL;
+static std::span<uint8_t> customBgSpan{};
 volatile bool charging = false;
 volatile u8 batteryLevel = 0;
 static bool advancedOptionsUnlocked = false;
@@ -590,7 +590,7 @@ void install(consoleInfo& info) {
     }
     if(installUnlaunch(info, disableAllPatches,
                         enableSoundAndSplash ? splashSoundBinaryPatchPath : NULL,
-                        customBgPath))
+                        customBgSpan))
     {
         messageBox("Install successful!\n");
         info.tmdGood = false;
@@ -615,19 +615,7 @@ void customBg() {
     {
         return;
     }
-    const char* customBg = backgroundMenu();
-    if(!customBg)
-    {
-        return;
-    }
-    if(strcmp(customBg, "default") == 0)
-    {
-        customBgPath = NULL;
-    }
-    else
-    {
-        customBgPath = customBg;
-    }
+    customBgSpan = backgroundMenu();
 }
 
 void doMainMenu(consoleInfo& info) {

@@ -3,10 +3,12 @@
 #include "storage.h"
 #include "tonccpy.h"
 #include "unlaunch.h"
-#include <algorithm>
+
 #include <nds/sha1.h>
-#include <string.h>
-#include <stdio.h>
+
+#include <algorithm>
+#include <cstring>
+#include <cstdio>
 #include <unistd.h>
 #include <memory>
 #include <format>
@@ -425,38 +427,19 @@ static bool verifyUnlaunchInstaller(void)
 	return true;
 }
 
-static bool patchCustomBackground(const char* customBackgroundPath)
+static bool patchCustomBackground(std::span<uint8_t> customBackground)
 {
-	if(!customBackgroundPath)
+	auto size = customBackground.size();
+	if(size == 0)
 	{
 		return true;
 	}
-	auto bgGif = fopen(customBackgroundPath, "rb");
-	if(!bgGif)
+	if(size < 7 || size > MAX_GIF_SIZE)
 	{
-		messageBox("\x1B[31mError:\x1B[33m Failed to open custom bg gif.\n");
+		messageBox("\x1B[31mError:\x1B[33m Gif file too big.\n");
 		return false;
 	}
-	auto size = getFileSize(bgGif);
-	if(size < 7 || size > 0x3C70)
-	{
-		messageBox("\x1B[31mError:\x1B[33m Invalid gif file.\n");
-		fclose(bgGif);
-		return false;
-	}
-	u16 gifWidth;
-	u16 gifHeight;
-	if((fseek(bgGif, 6, SEEK_SET) != 0) || (fread(&gifWidth, 1, sizeof(u16), bgGif) != sizeof(u16)) || (fread(&gifHeight, 1, sizeof(u16), bgGif) != sizeof(u16)))
-	{
-		messageBox("\x1B[31mError:\x1B[33m Failed to parse gif file.\n");
-		fclose(bgGif);
-		return false;
-	}
-	if (gifWidth != 256 || gifHeight != 192) {
-		messageBox("\x1B[31mError:\x1B[33m Gif file has invalid dimensions.\n");
-		fclose(bgGif);
-		return false;
-	}
+	
 	const u32 gifSignatureStart = 0x38464947;
 	const u32 gifSignatureEnd = 0x3B000044;
 	
@@ -468,14 +451,11 @@ static bool patchCustomBackground(const char* customBackgroundPath)
 	if(*gifStart != gifSignatureStart || *gifEnd != gifSignatureEnd)
 	{
 		messageBox("\x1B[31mError:\x1B[33m Gif offsets not matching.\n");
-		fclose(bgGif);
 		return false;
 	}
 	
-	fseek(bgGif, 0, SEEK_SET);
-	
-	//read the whole file, could be less than 0x3C70, but unlaunch should then just ignore the leftover data
-	fread(gifStart, 1, 0x3C70, bgGif);
+
+	std::memcpy(gifStart, customBackground.data(), size);
 	
 	return true;
 }
@@ -507,7 +487,7 @@ static bool applyBinaryPatch(const char* path)
     return true;
 }
 
-static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath)
+static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSoundBinaryPatchPath, std::span<uint8_t> customBackground)
 {
 	tonccpy(unlaunchInstallerBuffer, ogUnlaunchInstallerBuffer, sizeof(unlaunchInstallerBuffer));
     if (splashSoundBinaryPatchPath)
@@ -530,7 +510,7 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSou
             return false;
         }
     }
-	if(!patchCustomBackground(customBackgroundPath))
+	if(!patchCustomBackground(customBackground))
 	{
 		return false;
 	}
@@ -559,9 +539,9 @@ const char* getUnlaunchVersionString(UNLAUNCH_VERSION version)
 	return unlaunchVersionStrings[version];
 }
 
-bool installUnlaunch(const consoleInfo& info, bool disableAllPatches, const char* splashSoundBinaryPatchPath, const char* customBackgroundPath)
+bool installUnlaunch(const consoleInfo& info, bool disableAllPatches, const char* splashSoundBinaryPatchPath, std::span<uint8_t> customBackground)
 {
-	if (installerVersion == INVALID || !patchUnlaunchInstaller(disableAllPatches, splashSoundBinaryPatchPath, customBackgroundPath))
+	if (installerVersion == INVALID || !patchUnlaunchInstaller(disableAllPatches, splashSoundBinaryPatchPath, customBackground))
 		return false;
 
 	// Treat protos differently
