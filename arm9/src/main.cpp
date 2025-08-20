@@ -35,6 +35,9 @@ static bool isLauncherVersionSupported = true;
 PrintConsole topScreen;
 PrintConsole bottomScreen;
 
+int bgGifTop;
+int bgGifBottom;
+
 struct Stage2 {
     Sha1Digest sha;
     bool unlaunch_supported;
@@ -71,19 +74,21 @@ enum {
 
 static void setupScreens()
 {
-	REG_DISPCNT = MODE_FB0;
-	VRAM_A_CR = VRAM_ENABLE;
-
-	videoSetMode(MODE_0_2D);
-	videoSetModeSub(MODE_0_2D);
+	videoSetMode(MODE_5_2D);
+	videoSetModeSub(MODE_5_2D);
 
 	vramSetBankA(VRAM_A_MAIN_BG);
 	vramSetBankC(VRAM_C_SUB_BG);
 
-	consoleInit(&topScreen, 3, BgType_Text4bpp, BgSize_T_256x256, 31, 0, true, true);
-	consoleInit(&bottomScreen, 3, BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
+	consoleInit(&topScreen, 1, BgType_Text4bpp, BgSize_T_256x256, 14, 0, true, true);
+	consoleInit(&bottomScreen, 1, BgType_Text4bpp, BgSize_T_256x256, 14, 0, false, true);
 
 	clearScreen(&bottomScreen);
+
+	bgGifTop = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 2, 0);
+	bgHide(bgGifTop);
+	bgGifBottom = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 2, 0);
+	bgHide(bgGifBottom);
 
 	VRAM_A[100] = 0xFFFF;
 }

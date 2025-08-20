@@ -15,8 +15,8 @@ include $(DEVKITARM)/ds_rules
 # all directories are relative to this makefile
 #---------------------------------------------------------------------------------
 BUILD		:=	build
-SOURCES		:=	src src/nand src/nand/polarssl src/nand/twltool
-INCLUDES	:=	include src/nand
+SOURCES		:=	src src/lzw src/nand src/nand/polarssl src/nand/twltool
+INCLUDES	:=	include src/nand src/lzw
 DATA		:=
 
 

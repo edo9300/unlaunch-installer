@@ -16,6 +16,9 @@ extern volatile u8 batteryLevel;
 extern PrintConsole topScreen;
 extern PrintConsole bottomScreen;
 
+extern int bgGifTop;
+extern int bgGifBottom;
+
 void clearScreen(PrintConsole* screen);
 
 #ifdef __cplusplus

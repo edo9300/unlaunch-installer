@@ -2,13 +2,14 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdint>
-#include <format>
 #include <memory>
 #include <stdexcept>
 #include <vector>
 
 #include "storage.h"
 #include "unlaunch.h"
+
+#include "lzw/lzw.hpp"
 
 struct Gif {
     struct Header {
@@ -24,7 +25,7 @@ struct Gif {
     } __attribute__ ((__packed__)) header;
     static_assert(sizeof(Header) == 13);
 
-    std::array<uint8_t, 256 * 3> colorTable;
+    std::array<uint8_t, 256 * 3> colorTable{};
     size_t numColors;
 
     struct Frame {
@@ -51,18 +52,18 @@ struct Gif {
 static constexpr auto WIDTH = 256;
 static constexpr auto HEIGHT = 192;
 
-Gif getGif(std::string_view path) {
+Gif getGif(std::string_view path, volatile uint16_t* decompressedData) {
     Gif gif;
     auto file = fopen(path.data(), "rb");
     if (!file)
         throw std::runtime_error("Failed to open file");
 
     auto fileSptr = std::shared_ptr<FILE>(file, fclose);
-	
-	if(auto size = getFileSize(file); size < 7 || size > MAX_GIF_SIZE)
-	{
-		throw std::runtime_error("Gif file too big.\n");
-	}
+    
+    if(auto size = getFileSize(file); size < 7 || size > MAX_GIF_SIZE)
+    {
+        throw std::runtime_error("Gif file too big.\n");
+    }
 
     auto& header = gif.header;
 
@@ -139,10 +140,29 @@ Gif getGif(std::string_view path) {
             }
 
             frame.image.lzwMinimumCodeSize = fgetc(file);
+
+            LZWReader reader(frame.image.lzwMinimumCodeSize, [&, it = decompressedData](auto begin, auto end) mutable {
+                const auto ds_color_table = [&]{
+                    std::array<uint16_t, 256> ret{};
+                    for(int i = 0; i < numColors; ++i){
+                        auto r = color_table[(i * 3) + 0] >> 3;
+                        auto g = color_table[(i * 3) + 1] >> 3;
+                        auto b = color_table[(i * 3) + 2] >> 3;
+                        ret[i] =  RGB15(r,g,b) | BIT(15);
+                    }
+                    return ret;
+                }();
+                std::transform(begin, end, it, [&](auto idx) {
+                    return ds_color_table[idx];
+                });
+                it += std::distance(begin, end);
+            });
+
             while (uint8_t size = fgetc(file)) {
                 std::vector<uint8_t> dataChunk;
                 dataChunk.resize(size);
                 fread(dataChunk.data(), 1, size, file);
+                reader.decode(dataChunk.begin(), dataChunk.end());
                 frame.image.imageDataChunks.push_back(std::move(dataChunk));
             }
 
@@ -199,7 +219,7 @@ std::span<uint8_t> writeGif(const Gif& gif, std::array<uint8_t, MAX_GIF_SIZE>& o
 }
 
 
-std::span<uint8_t> parseGif(const char* path, std::array<uint8_t, MAX_GIF_SIZE>& outArr) {
-	const auto gif = getGif(path);
-	return writeGif(gif, outArr);
+std::span<uint8_t> parseGif(const char* path, std::array<uint8_t, MAX_GIF_SIZE>& outArr, volatile uint16_t* decompressedData) {
+    const auto gif = getGif(path, decompressedData);
+    return writeGif(gif, outArr);
 }

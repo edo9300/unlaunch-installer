@@ -9,6 +9,7 @@
 #include <format>
 #include <nds.h>
 #include <dirent.h>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -51,7 +52,8 @@ std::span<uint8_t> backgroundMenu()
 	clearScreen(&topScreen);
 
 	//menu
-	Menu* m = newMenu();
+	auto mSptr = std::shared_ptr<Menu>(newMenu(), freeMenu);
+	auto* m = mSptr.get();
 	setMenuHeader(m, "BACKGROUNDS");
 	
 	const auto& bgs = getBackgroundList();
@@ -68,33 +70,43 @@ std::span<uint8_t> backgroundMenu()
 	//bottom screen
 	printMenu(m);
 
-	while (!programEnd)
-	{
-		swiWaitForVBlank();
-		scanKeys();
-
-		if (moveCursor(m))
-			printMenu(m);
-
-		if (auto keys = keysDown(); keys & KEY_A)
-			break;
-		else if(keys & KEY_B)
+	while (!programEnd) {
+		while (!programEnd)
 		{
-			m->cursor = bgs.size() + 1;
-			break;
+			swiWaitForVBlank();
+			scanKeys();
+
+			if (moveCursor(m))
+				printMenu(m);
+
+			if (auto keys = keysDown(); keys & KEY_A)
+				break;
+			else if(keys & KEY_B)
+			{
+				m->cursor = bgs.size() + 1;
+				break;
+			}
 		}
-	}
 
-	auto selection = static_cast<size_t>(m->cursor);
-	freeMenu(m);
+		auto selection = static_cast<size_t>(m->cursor);
 
-	if(selection < bgs.size()) {
+		if(selection > bgs.size())
+			return {};
 		try {
-			return parseGif(bgs[selection].second.data(), currentlyLoadedGif);
+			const auto res = parseGif(bgs[selection].second.data(), currentlyLoadedGif, bgGetGfxPtr(bgGifTop));
+			bgHide(topScreen.bgId);
+			bgShow(bgGifTop);
+			auto confirmed = (choiceBox("Confirm this background?") == YES);
+			bgShow(topScreen.bgId);
+			bgHide(bgGifTop);
+			if(confirmed)
+				return res;
 		} catch(const std::exception& e) {
 			messageBox(std::format("\x1B[31mError:\x1B[33m The image could not\n"
 								   "be loaded: {}", e.what()).data());
 		}
+
+		printMenu(m);
 	}
 
 	return {};
