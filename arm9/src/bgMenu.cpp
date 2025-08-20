@@ -46,7 +46,7 @@ static const auto& getBackgroundList()
 	return bgs;
 }
 
-std::span<uint8_t> backgroundMenu()
+std::optional<std::span<uint8_t>> backgroundMenu()
 {
 	//top screen
 	clearScreen(&topScreen);
@@ -88,15 +88,24 @@ std::span<uint8_t> backgroundMenu()
 			}
 		}
 
+		if(programEnd)
+			return std::nullopt;
+
 		auto selection = static_cast<size_t>(m->cursor);
 
-		if(selection > bgs.size())
+		if(selection == bgs.size())
 			return {};
+		else if (selection > bgs.size())
+		{
+			return std::nullopt;
+		}
 		try {
 			const auto res = parseGif(bgs[selection].second.data(), currentlyLoadedGif, bgGetGfxPtr(bgGifTop));
+			swiWaitForVBlank();
 			bgHide(topScreen.bgId);
 			bgShow(bgGifTop);
 			auto confirmed = (choiceBox("Confirm this background?") == YES);
+			swiWaitForVBlank();
 			bgShow(topScreen.bgId);
 			bgHide(bgGifTop);
 			if(confirmed)

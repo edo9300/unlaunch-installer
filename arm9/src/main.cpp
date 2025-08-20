@@ -620,7 +620,8 @@ void customBg() {
     {
         return;
     }
-    customBgSpan = backgroundMenu();
+	if(auto newBg = backgroundMenu(); newBg.has_value())
+		customBgSpan = *newBg;
 }
 
 void doMainMenu(consoleInfo& info) {
