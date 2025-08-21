@@ -3,6 +3,7 @@
 #include <format>
 #include <exception>
 #include <memory>
+#include <vector>
 
 #include "bgMenu.h"
 #include "consoleInfo.h"
@@ -273,6 +274,33 @@ void checkStage2Supported() {
     exit(0);
 }
 
+std::vector<std::string_view> getInstallerPaths(int argc, char **argv) {
+	if(argc > 0)
+		return {std::string_view{argv[0]}};
+	DeviceList* deviceList = getDeviceList();
+
+	if(deviceList) return {std::string_view{ deviceList->appname}};
+
+	return {"sd:/ntrboot.nds", "sd:/boot.nds"};
+}
+
+void setupNitrofs(int argc, char **argv) {
+	for(const auto& path : getInstallerPaths(argc, argv)){
+		if(!nitroFSInit(path.data()))
+			continue;
+		auto* file = fopen("nitro:/installer.ver", "rb");
+		if(!file)
+			continue;
+		char verstring[10]{};
+		fread(verstring, 1, sizeof(verstring) - 1, file);
+		fclose(file);
+		if(std::string_view{verstring} == VERSION)
+			return;
+	}
+	messageBox("nitroFSInit()...\x1B[31mFailed\n\x1B[47m");
+	exit(0);
+}
+
 void checkNocashFooter(consoleInfo& info) {
     NocashFooter footer;
 
@@ -322,16 +350,6 @@ void waitForBatteryChargedEnough() {
         if (choiceBox("\x1B[47mBattery is too low!\nPlease plug in the console.\n\nContinue?") == NO)
             exit(0);
     }
-}
-
-const char* getInstallerPath(int argc, char **argv) {
-    if(argc > 0)
-        return argv[0];
-    DeviceList* deviceList = getDeviceList();
-
-    if(deviceList) return deviceList->appname;
-
-    return "sd:/ntrboot.nds";
 }
 
 void loadUnlaunchInstaller() {
@@ -688,11 +706,7 @@ int main(int argc, char **argv)
 {
     setup();
     checkStage2Supported();
-
-    if (!nitroFSInit(getInstallerPath(argc, argv)))
-    {
-        messageBox("nitroFSInit()...\x1B[31mFailed\n\x1B[47m");
-    }
+	setupNitrofs(argc, argv);
 
     loadUnlaunchInstaller();
 
