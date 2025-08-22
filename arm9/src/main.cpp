@@ -469,10 +469,10 @@ void parseLauncherInfo(std::string_view launcher_tid_str, consoleInfo& info) {
             return ret;
         }();
 
-        std::shared_ptr<FILE> tmd{fopen(info.launcherTmdPath.data(), "rb"), fclose};
-        if(!tmd) {
+		std::shared_ptr<FILE> tmd{fopen(info.launcherTmdPath.data(), "rb"), [](auto* ptr){ if(ptr) fclose(ptr);}};
+		if(!tmd) {
             info.tmdFound = false;
-        } else if(auto tmdSize = getFileSize(tmd.get()); tmdSize < 520) {
+		} else if(auto tmdSize = getFileSize(tmd.get()); tmdSize < 520) {
             //if size isn't at least 520 then the tmd is already invalid
             info.tmdInvalid = true;
         } else {

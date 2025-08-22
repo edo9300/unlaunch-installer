@@ -88,13 +88,13 @@ static bool removeHnaaLauncher()
 
 static bool restoreMainTmd(const consoleInfo& info, bool removeHNAABackup)
 {
-    std::shared_ptr<FILE> launcherTmdSptr{fopen(info.launcherTmdPath.data(), "r+b"), fclose};
-    if(!launcherTmdSptr)
+	std::shared_ptr<FILE> launcherTmdSptr{fopen(info.launcherTmdPath.data(), "r+b"), [](auto* ptr){ if(ptr) fclose(ptr);}};
+	if(!launcherTmdSptr)
 	{
 		messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
 		return false;
 	}
-    FILE* launcherTmd = launcherTmdSptr.get();
+	FILE* launcherTmd = launcherTmdSptr.get();
 
     // If the tmd is patched, assume the HNAA backup is already set in place.
     if(info.tmdPatched) {
