@@ -93,10 +93,11 @@ void getConsoleID(u8 *consoleID)
 
 static bool nandio_startup()
 {
-	if (!nand_Startup())
+	// we do the startup in the arm7
+	/*if (!nand_Startup())
 	{
 		return false;
-	}
+	}*/
 
 	nand_ReadSectors(0, 1, sector_buf);
 	is3DS = parse_ncsd(sector_buf) == 0;

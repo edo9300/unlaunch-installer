@@ -27,8 +27,6 @@
 		distribution.
 
 ---------------------------------------------------------------------------------*/
-#include "my_sdmmc.h"
-
 #include "deviceList.h"
 #include <nds.h>
 #include <string.h>
@@ -94,8 +92,6 @@ void aes(void* in, void* out, void* iv, u32 method)
 	//REG_AES_CNT &= ~0x80000000;
 	//if (method & (AES_CTR_DECRYPT | AES_CTR_ENCRYPT)) add_ctr((u8*)iv);
 }
-
-int my_sdmmc_nand_startup();
 
 #define DEVICE_LIST_SENTINEL *(vu32*)0x02300020
 
@@ -166,9 +162,9 @@ int main()
 			}
 		}
 
-		my_sdmmc_nand_startup();
-		my_sdmmc_get_cid(true, (u32*)0x2FFD7BC);	// Get eMMC CID
-		//sdmmc_nand_cid((u32*)0x2FFD7BC);
+		sdmmc_controller_init(false);
+		sdmmc_nand_init();
+		sdmmc_nand_cid((u32*)0x2FFD7BC);	// Get eMMC CID
 	}
 
 	SetYtrigger(80);
