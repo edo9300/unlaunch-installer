@@ -74,7 +74,6 @@ int copyFilePart(char const* src, u32 offset, u32 size, char const* dst)
 
 	if (!fin)
 	{
-		fclose(fin);
 		return 3;
 	}
 	else
@@ -87,7 +86,6 @@ int copyFilePart(char const* src, u32 offset, u32 size, char const* dst)
 		if (!fout)
 		{
 			fclose(fin);
-			fclose(fout);
 			return 4;
 		}
 		else
@@ -148,7 +146,8 @@ unsigned long long getFileSizePath(char const* path)
 
 	FILE* f = fopen(path, "rb");
 	unsigned long long size = getFileSize(f);
-	fclose(f);
+	if(f)
+		fclose(f);
 
 	return size;
 }
