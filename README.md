@@ -59,6 +59,8 @@ More specifically, the sound and splash patch modifies the arm7 instruction of u
 address 0x1308 (in the then relocated code it is run at 0x23fe038). The patched instruction
 is a `bl` to the function patching a second binary blob of the launcher, and is replaced with
 a nop.
+
+# This patch is currently not used because it breaks system titles launching
 The other patch, modifies the code responsible for reading the launcher title id from HWINFO.
 The original code is as follow
 ```

@@ -380,9 +380,11 @@ void loadUnlaunchInstallerPatch() {
     } else if(fileExists("nitro:/sound-and-splash-patch.bin")) {
         splashSoundBinaryPatchPath = "nitro:/sound-and-splash-patch.bin";
     }
+#if 0
     if(!fileExists("nitro:/force-hnaa-patch.bin")) {
         throw std::runtime_error(std::format("Failed to find hnaa patch ({})", "nitro:/force-hnaa-patch.bin"));
     }
+#endif
 }
 
 void parseLauncherInfo(std::string_view launcher_tid_str, consoleInfo& info) {
