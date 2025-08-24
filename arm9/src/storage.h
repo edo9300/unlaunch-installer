@@ -4,6 +4,8 @@
 #include <nds/ndstypes.h>
 #include <stdio.h>
 
+#define NAND(path) ("fat:/" path)
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -1,41 +1,25 @@
-
 #include <nds.h>
 #include <nds/disc_io.h>
+#include <nds/arm9/dldi.h>
 #include <malloc.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include "crypto.h"
 #include "sector0.h"
 #include "f_xy.h"
-#include "../message.h"
 #include "nandio.h"
 #include "u128_math.h"
 
 #define STAGE2_HEADER_SECTOR 1
 #define NOCASH_FOOTER_SECTOR 2044
 
-/************************ Function Protoypes **********************************/
-
-static bool nandio_startup();
-static bool nandio_is_inserted();
-static bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer);
-static bool nandio_write_sectors(sec_t offset, sec_t len, const void *buffer);
-static bool nandio_clear_status();
-bool nandio_shutdown();
-
-/************************ Constants / Defines *********************************/
-
-const DISC_INTERFACE io_dsi_nand = {
-	NAND_DEVICENAME,
-	FEATURE_MEDIUM_CANREAD | FEATURE_MEDIUM_CANWRITE,
-	nandio_startup,
-	nandio_is_inserted,
-	nandio_read_sectors,
-	nandio_write_sectors,
-	nandio_clear_status,
-	nandio_shutdown
-};
-
-bool is3DS;
+// used by the "dldi"
+extern bool nandio_startup();
+extern bool nandio_is_inserted();
+extern bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer);
+extern bool nandio_write_sectors(sec_t offset, sec_t len, const void *buffer);
+extern bool nandio_clear_status();
+extern bool nandio_shutdown();
 
 static bool writingLocked = true;
 static bool nandWritten = false;
@@ -91,16 +75,15 @@ void getConsoleID(u8 *consoleID)
 	memcpy(&consoleID[4], &key_x[0xC], 4);
 }
 
-static bool nandio_startup()
+bool nandio_startup()
 {
-	// we do the startup in the arm7
-	/*if (!nand_Startup())
+	if (!nand_Startup())
 	{
 		return false;
-	}*/
+	}
 
 	nand_ReadSectors(0, 1, sector_buf);
-	is3DS = parse_ncsd(sector_buf) == 0;
+	bool is3DS = parse_ncsd(sector_buf) == 0;
 	if (is3DS) return false;
 
 	u8 consoleID[8];
@@ -134,7 +117,7 @@ static bool nandio_startup()
 	return crypt_buf != 0;
 }
 
-static bool nandio_is_inserted()
+bool nandio_is_inserted()
 {
 	return true;
 }
@@ -180,7 +163,7 @@ bool nandio_read_nocash_footer(NocashFooter* footer)
 	{
 		return false;
 	}
-	
+
 	memcpy(footer, sector_buf, sizeof(NocashFooter));
 	return true;
 }
@@ -189,7 +172,7 @@ bool nandio_write_nocash_footer(NocashFooter* footer)
 {
 	if (writingLocked)
 		return false;
-	
+
 	if(!nand_ReadSectors(NOCASH_FOOTER_SECTOR, 1, sector_buf))
 	{
 		return false;
@@ -233,7 +216,7 @@ static bool write_sectors(sec_t start, sec_t len, const void *buffer)
 }
 
 
-static bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer)
+bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer)
 {
 	while (len >= CRYPT_BUF_LEN)
 	{
@@ -254,7 +237,7 @@ static bool nandio_read_sectors(sec_t offset, sec_t len, void *buffer)
 	}
 }
 
-static bool nandio_write_sectors(sec_t offset, sec_t len, const void *buffer)
+bool nandio_write_sectors(sec_t offset, sec_t len, const void *buffer)
 {
 	if (writingLocked)
 		return false;
@@ -280,7 +263,7 @@ static bool nandio_write_sectors(sec_t offset, sec_t len, const void *buffer)
 	}
 }
 
-static bool nandio_clear_status()
+bool nandio_clear_status()
 {
 	return true;
 }
@@ -315,6 +298,9 @@ bool nandio_force_fat_fix()
 	return true;
 }
 
+static u32 sector_buf32_2[SECTOR_SIZE/sizeof(u32)];
+static u8 *sector_buf_2 = (u8*)sector_buf32_2;
+
 void nandio_synchronize_fats()
 {
 	if (!nandWritten) return;
@@ -335,7 +321,7 @@ void nandio_synchronize_fats()
 */
 	if (stagingLevels > 1)
 	{
-		for (u32 sector = 0;sector < sectorsPerFatCopy; sector++)
+		for (u32 sector = 0; sector < sectorsPerFatCopy; sector++)
 		{
 			// read fat sector
 			nandio_read_sectors(fat_sig_fix_offset + reservedSectors + sector, 1, sector_buf);
@@ -343,7 +329,10 @@ void nandio_synchronize_fats()
 			writingLocked = false;
 			for (int stage = 1;stage < stagingLevels;stage++)
 			{
-				nandio_write_sectors(fat_sig_fix_offset + reservedSectors + sector + (stage *sectorsPerFatCopy), 1, sector_buf);
+				nandio_read_sectors(fat_sig_fix_offset + reservedSectors + sector + (stage *sectorsPerFatCopy), 1, sector_buf_2);
+				if(memcmp(sector_buf_2, sector_buf, SECTOR_SIZE) != 0) {
+					nandio_write_sectors(fat_sig_fix_offset + reservedSectors + sector + (stage *sectorsPerFatCopy), 1, sector_buf);
+				}
 			}
 			writingLocked = true;
 		}

@@ -1,11 +1,11 @@
 #include "storage.h"
 #include "main.h"
 #include "message.h"
+#include <sys/stat.h>
 #include <errno.h>
 #include <nds/sha1.h>
 #include <dirent.h>
-
-#define TITLE_LIMIT 39
+#include <sys/statvfs.h>
 
 //progress bar
 static int lastBars = 0;
@@ -22,25 +22,25 @@ static void printProgressBar(float percent)
 	{
 		consoleSelect(&topScreen);
 
-		iprintf("\x1B[42m");	//green
+		printf("\x1B[42m");	//green
 
 		//Print frame
 		if (lastBars <= 0)
 		{
-			iprintf("\x1b[23;0H[");
-			iprintf("\x1b[23;31H]");
+			printf("\x1b[23;0H[");
+			printf("\x1b[23;31H]");
 		}
 
 		//Print bars
 		if (bars > 0)
 		{
 			for (int i = 0; i < bars; i++)
-				iprintf("\x1b[23;%dH|", 1 + i);
+				printf("\x1b[23;%dH|", 1 + i);
 		}
 
 		lastBars = bars;
 
-		iprintf("\x1B[47m");	//white
+		printf("\x1B[47m");	//white
 	}
 }
 
@@ -48,7 +48,7 @@ static void clearProgressBar()
 {
 	lastBars = 0;
 	consoleSelect(&topScreen);
-	iprintf("\x1b[23;0H                                ");
+	printf("\x1b[23;0H                                ");
 }
 
 //files
@@ -223,34 +223,16 @@ bool safeCreateDir(const char* path)
 
 bool removeIfExists(const char* path)
 {
-	return remove(path) == 0 || errno == ENOENT;
+	if(remove(path) == 0 || errno == ENOENT) {
+		return true;
+	}
+	return rmdir(path) == 0 || errno == ENOENT;
 }
-
-// Filesystem type
-typedef enum {FS_UNKNOWN, FS_FAT12, FS_FAT16, FS_FAT32} FS_TYPE;
-//trimmed down PARTITION struct from libfat internals
-typedef struct {
-	const void* disc;
-	void*                cache;
-	// Info about the partition
-	FS_TYPE               filesysType;
-	uint64_t              totalSize;
-	sec_t                 rootDirStart;
-	uint32_t              rootDirCluster;
-	uint32_t              numberOfSectors;
-	sec_t                 dataStart;
-	uint32_t              bytesPerSector;
-	uint32_t              sectorsPerCluster;
-	uint32_t              bytesPerCluster;
-	uint32_t              fsInfoSector;
-} PARTITION;
-
-extern PARTITION* _FAT_partition_getPartitionFromPath(const char* path);
 
 u32 getClusterSizeForPartition(const char* path)
 {
-	PARTITION* p = _FAT_partition_getPartitionFromPath(path);
-	if(!p)
+	struct statvfs s;
+	if(statvfs(path, &s) != 0)
 		return 0;
-	return p->bytesPerCluster;
+	return s.f_bsize;
 }

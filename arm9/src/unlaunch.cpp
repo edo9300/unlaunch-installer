@@ -15,8 +15,8 @@
 
 static char unlaunchInstallerBuffer[0x30000];
 static char ogUnlaunchInstallerBuffer[0x30000];
-static const char* hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd";
-static const char* hnaaBackupTmdPath = "nand:/title/00030017/484e4141/content/title.tmd.bak";
+static const char* hnaaTmdPath = NAND("title/00030017/484e4141/content/title.tmd");
+static const char* hnaaBackupTmdPath = NAND("title/00030017/484e4141/content/title.tmd.bak");
 
 UNLAUNCH_VERSION installerVersion{INVALID};
 size_t unlaunchInstallerSize{};
@@ -57,7 +57,7 @@ bool isValidUnlaunchInstallerSize(size_t size)
 
 static bool removeHnaaLauncher()
 {
-    auto* errString = [] -> const char* {
+	auto errString = [] -> std::string {
         if(fileExists(hnaaTmdPath)) {
             if(!toggleFileReadOnly(hnaaTmdPath, false))
             {
@@ -68,19 +68,19 @@ static bool removeHnaaLauncher()
                 return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's title.tmd\n";
             }
         }
-		if(!removeIfExists("nand:/title/00030017/484e4141/content"))
+		if(!removeIfExists(NAND("title/00030017/484e4141/content")))
 		{
-			return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's content folder\n";
+			return std::format("\x1B[31mError:\x1B[33m Failed to delete ulnaunch's content folder: {}\n", errno);
 		}
-		if(!removeIfExists("nand:/title/00030017/484e4141"))
+		if(!removeIfExists(NAND("title/00030017/484e4141")))
 		{
-			return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's 484e4141 folder\n";
+			return std::format("\x1B[31mError:\x1B[33m Failed to delete ulnaunch's 484e4141 folder: {}\n", errno);
 		}
-		return nullptr;
+		return "";
 	}();
-	if(errString)
+	if(errString.size())
 	{
-		messageBox(errString);
+		messageBox(errString.data());
 		return false;
 	}
 	return true;
@@ -278,9 +278,9 @@ static bool writeUnlaunchTmd(const char* path)
 static bool writeUnlaunchToHNAAFolder()
 {
 	//Create HNAA launcher folder
-	if (!safeCreateDir("nand:/title/00030017")
-		|| !safeCreateDir("nand:/title/00030017/484e4141")
-		|| !safeCreateDir("nand:/title/00030017/484e4141/content")) {
+	if (!safeCreateDir(NAND("title/00030017"))
+		|| !safeCreateDir(NAND("title/00030017/484e4141"))
+		|| !safeCreateDir(NAND("title/00030017/484e4141/content"))) {
 		return false;
 	}
 
@@ -356,12 +356,12 @@ static bool installUnlaunchProtoConsole(void)
 	{
 		rename(hnaaTmdPath, hnaaBackupTmdPath);
 		// Mark backup tmd as readonly, just to be sure
-		toggleFileReadOnly("nand:/title/00030017/484e4141/content/title.tmd.bak", true);
+		toggleFileReadOnly(NAND("title/00030017/484e4141/content/title.tmd.bak"), true);
 	}
 	
 	if(!writeUnlaunchTmd(hnaaTmdPath))
 	{
-		copyFile("nand:/title/00030017/484e4141/content/title.tmd.bak", hnaaTmdPath);
+		copyFile(NAND("title/00030017/484e4141/content/title.tmd.bak"), hnaaTmdPath);
 		return false;
 	}
 	
@@ -492,7 +492,7 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSou
 	tonccpy(unlaunchInstallerBuffer, ogUnlaunchInstallerBuffer, sizeof(unlaunchInstallerBuffer));
     if (splashSoundBinaryPatchPath)
     {
-        iprintf("Applying splash and sound patch\n");
+		printf("Applying splash and sound patch\n");
         if(!applyBinaryPatch(splashSoundBinaryPatchPath))
         {
             return false;
@@ -505,7 +505,7 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSou
             memcpy((unlaunchInstallerBuffer + 520) + patchOffset, newID, 3);
         }
 #if 0
-        iprintf("Applying HNAA patch\n");
+		printf("Applying HNAA patch\n");
         if(!applyBinaryPatch("nitro:/force-hnaa-patch.bin"))
         {
             return false;

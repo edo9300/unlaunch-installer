@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <cstdio>
@@ -144,7 +145,7 @@ Gif getGif(std::string_view path, volatile uint16_t* decompressedData) {
             LZWReader reader(frame.image.lzwMinimumCodeSize, [&, it = decompressedData](auto begin, auto end) mutable {
                 const auto ds_color_table = [&]{
                     std::array<uint16_t, 256> ret{};
-                    for(int i = 0; i < numColors; ++i){
+					for(auto i = 0u; i < numColors; ++i){
                         auto r = color_table[(i * 3) + 0] >> 3;
                         auto g = color_table[(i * 3) + 1] >> 3;
                         auto b = color_table[(i * 3) + 2] >> 3;

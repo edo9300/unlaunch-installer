@@ -32,7 +32,7 @@
 #include <string.h>
 
 //---------------------------------------------------------------------------------
-void VcountHandler()
+void VblankHandler()
 //---------------------------------------------------------------------------------
 {
 	inputGetAndSend();
@@ -95,6 +95,8 @@ void aes(void* in, void* out, void* iv, u32 method)
 
 #define DEVICE_LIST_SENTINEL *(vu32*)0x02300020
 
+static u32 CID[4];
+
 //---------------------------------------------------------------------------------
 int main()
 //---------------------------------------------------------------------------------
@@ -103,19 +105,12 @@ int main()
 	// clear sound registers
 	dmaFillWords(0, (void*)0x04000400, 0x100);
 
-	REG_SOUNDCNT |= SOUND_ENABLE;
-	writePowerManagement(PM_CONTROL_REG, ( readPowerManagement(PM_CONTROL_REG) & ~PM_SOUND_MUTE ) | PM_SOUND_AMP );
-	powerOn(POWER_SOUND);
-
 	readUserSettings();
-	ledBlink(0);
+	ledBlink(LED_ALWAYS_ON);
 
 	irqInit();
 	irqSetAUX(IRQ_I2C, i2cIRQHandlerCustom);
-	// Start the RTC tracking IRQ
-	initClockIRQ();
 	fifoInit();
-	touchInit();
 
 	if (isDSiMode() /*|| ((REG_SCFG_EXT & BIT(17)) && (REG_SCFG_EXT & BIT(18)))*/)
 	{
@@ -162,20 +157,32 @@ int main()
 			}
 		}
 
-		sdmmc_controller_init(false);
-		sdmmc_nand_init();
-		sdmmc_nand_cid((u32*)0x2FFD7BC);	// Get eMMC CID
+		SDMMC_init(SDMMC_DEV_eMMC);
+		SDMMC_getCid(SDMMC_DEV_eMMC, CID);
+		// the CID returned here is the "correct" version as expected
+		// by general tools, we need to convert it back to the "wrong"
+		// version matching the direct hw output as that's what used
+		// for the cryptographic functions for the dsi nand
+		u32 realCID[4];
+
+		realCID[0] = (CID[3] >> 8) | (CID[2] << 24);
+		realCID[1] = (CID[2] >> 8) | (CID[1] << 24);
+		realCID[2] = (CID[1] >> 8) | (CID[0] << 24);
+		realCID[3] = (CID[0] >> 8);
+		
+		memcpy((u32*)0x2FFD7BC, realCID, sizeof(CID));
+		SDMMC_deinit(SDMMC_DEV_eMMC);
 	}
+	
+	fifoSendValue32(FIFO_USER_02, 42);
 
 	SetYtrigger(80);
 
-	installSoundFIFO();
-
 	installSystemFIFO();
 
-	irqSet(IRQ_VCOUNT, VcountHandler);
+	irqSet(IRQ_VBLANK, VblankHandler);
 
-	irqEnable( IRQ_VBLANK | IRQ_VCOUNT | IRQ_NETWORK);
+	irqEnable(IRQ_VBLANK);
 
 	// Keep the ARM7 mostly idle
 	int oldBatteryStatus = 0;
