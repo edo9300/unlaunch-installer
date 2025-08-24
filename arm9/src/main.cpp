@@ -1,9 +1,13 @@
+#include <dirent.h>
 #include <string_view>
 #include <string>
 #include <format>
 #include <exception>
 #include <memory>
 #include <vector>
+
+#include <filesystem.h>
+#include <nds/arm9/dldi.h>
 
 #include "bgMenu.h"
 #include "consoleInfo.h"
@@ -14,8 +18,6 @@
 #include "storage.h"
 #include "version.h"
 #include "unlaunch.h"
-#include "nitrofs.h"
-#include "deviceList.h"
 #include "nocashFooter.h"
 
 using namespace std::string_view_literals;
@@ -100,15 +102,15 @@ static int mainMenu(const consoleInfo& info, int cursor)
 	//top screen
 	clearScreen(&topScreen);
 
-	iprintf("\t\"Safe\" unlaunch installer\n");
-	iprintf("\nversion %s\n", VERSION);
-	iprintf("\n\n\x1B[41mWARNING:\x1B[47m This tool can write to"
+	printf("\t\"Safe\" unlaunch installer\n");
+	printf("\nversion %s\n", VERSION);
+	printf("\n\n\x1B[41mWARNING:\x1B[47m This tool can write to"
 			"\nyour internal NAND!"
 			"\n\nThis always has a risk, albeit"
 			"\nlow, of \x1B[41mbricking\x1B[47m your system"
 			"\nand should be done with caution!\n");
-    iprintf("\n\t  \x1B[46mhttps://dsi.cfw.guide\x1B[47m\n");
-    iprintf("\x1b[23;0Hedo9300 - 2025");
+	printf("\n\t  \x1B[46mhttps://dsi.cfw.guide\x1B[47m\n");
+	printf("\x1b[23;0Hedo9300 - 2025");
 
 	//menu
 	Menu* m = newMenu();
@@ -146,7 +148,7 @@ static int mainMenu(const consoleInfo& info, int cursor)
 	else if(advancedOptionsUnlocked)
     {
         addMenuItem(m, restore_string_no_backup, NULL, !info.isStockTmd(), false);
-        addMenuItem(m, "Write nocash footer", NULL, info.needsNocashFooterToBeWritten, false);
+		addMenuItem(m, "Write nocash footer", NULL, info.needsNocashFooterToBeWritten, false);
         addMenuItem(m, tidPatchesStr, NULL, tidPatchesSupported, false);
 	}
 
@@ -225,16 +227,28 @@ void setup() {
     {
         messageBox("\x1B[31mError:\x1B[33m This app is exclusively for DSi.");
         exit(0);
-    }
+	}
 
-    //setup sd card access
-    if (!fatInitDefault())
+	while(1){
+		if(fifoCheckValue32(FIFO_USER_02)) {  //checking to see when that plucky little arm7 has finished its consoleID magic
+			break;
+		}
+		swiWaitForVBlank();
+	}
+
+	//setup sd card and nand access
+	if (!fatInitDefault())
     {
         messageBox("fatInitDefault()...\x1B[31mFailed\n\x1B[47m");
-    }
+	}
+	
+	if (!nandInit(false))
+    {
+        messageBox("\x1B[31mFailed to mount NAND\n\x1B[47m");
+	}
 
     u32 clusterSize = getClusterSizeForPartition("sd:/");
-    if(clusterSize > 32768)
+	if(clusterSize > 32768)
     {
         messageBox(std::format("\x1B[41mWARNING:\x1B[47m This SD card cluster\n"
                                "size is currently {}KB,\n"
@@ -244,18 +258,11 @@ void setup() {
                                "won't boot as long as this SD\n"
                                "card is inserted.", clusterSize / 1024).data());
     }
-
-    //setup nand access
-    if (!fatMountSimple("nand", &io_dsi_nand))
-    {
-        messageBox("nand init \x1B[31mfailed\n\x1B[47m");
-        exit(0);
-    }
 }
 
 void checkStage2Supported() {
     Sha1Digest digest;
-    nandio_calculate_stage2_sha(digest.data());
+	nandio_calculate_stage2_sha(digest.data());
     for(const auto& [sha, unlaunch]: knownStage2s) {
         if(sha == digest) {
             if(!unlaunch) {
@@ -277,10 +284,6 @@ void checkStage2Supported() {
 std::vector<std::string_view> getInstallerPaths(int argc, char **argv) {
 	if(argc > 0)
 		return {std::string_view{argv[0]}};
-	DeviceList* deviceList = getDeviceList();
-
-	if(deviceList) return {std::string_view{ deviceList->appname}};
-
 	return {"sd:/ntrboot.nds", "sd:/boot.nds"};
 }
 
@@ -328,12 +331,11 @@ bool writeNocashFooter(consoleInfo& info) {
     if(!info.needsNocashFooterToBeWritten)
         return true;
 
-    if(!nandio_unlock_writing())
-        return false;
-
+    nand_WriteProtect(false);
     printf("Writing nocash footer\n");
     auto res = nandio_write_nocash_footer(&info.nocashFooter);
-    nandio_lock_writing();
+    nand_WriteProtect(true);
+
     if(!res)
     {
         messageBox("Failed to write nocash footer");
@@ -364,7 +366,7 @@ void loadUnlaunchInstaller() {
                    "Attempting to use the bundled one.");
     }
 
-    foundUnlaunchInstallerVersion = loadUnlaunchInstaller("nitro:/unlaunch.dsi");
+	foundUnlaunchInstallerVersion = loadUnlaunchInstaller("nitro:/UNLAUNCH.DSI");
 
     if(foundUnlaunchInstallerVersion != INVALID)
         return;
@@ -386,7 +388,7 @@ void loadUnlaunchInstallerPatch() {
 }
 
 void parseLauncherInfo(std::string_view launcher_tid_str, consoleInfo& info) {
-    auto launcher_content_path = std::format("nand:/title/00030017/{}/content", launcher_tid_str);
+	auto launcher_content_path = std::format("nand:/title/00030017/{}/content", launcher_tid_str);
 
     auto [tmd_found, expected_launcher_build, retailLauncherPath] = [&] {
         std::shared_ptr<DIR> pdir{opendir(launcher_content_path.c_str()), closedir};
@@ -511,11 +513,11 @@ void parseLauncherInfo(std::string_view launcher_tid_str, consoleInfo& info) {
 }
 
 void retrieveInstalledLauncherInfo(consoleInfo& info) {
-    static constexpr auto hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd"sv;
+	static constexpr auto hnaaTmdPath = "nand:/title/00030017/484e4141/content/title.tmd"sv;
     const auto [launcher_tid_str, region] = [] -> std::pair<std::string, u8> {
         uint32_t launcherTid;
         {
-            auto* file = fopen("nand:/sys/HWINFO_S.dat", "rb");
+			auto* file = fopen("nand:/sys/HWINFO_S.dat", "rb");
             if(!file)
                 return std::make_pair("", static_cast<u8>(0xFF));
             fseek(file, 0xA0, SEEK_SET);
@@ -557,10 +559,7 @@ void uninstall(consoleInfo& info, bool noBackup) {
     {
         return;
     }
-    if(!nandio_unlock_writing())
-    {
-        return;
-    }
+	nand_WriteProtect(false);
     if(uninstallUnlaunch(info, unsafeUninstall))
     {
         messageBox("Uninstall successful!\n");
@@ -573,9 +572,7 @@ void uninstall(consoleInfo& info, bool noBackup) {
     {
         messageBox("\x1B[31mError:\x1B[33m Uninstall failed\n");
     }
-    nandio_lock_writing();
-    printf("Synchronizing FAT tables...\n");
-    nandio_synchronize_fats();
+	nand_WriteProtect(true);
 }
 
 void install(consoleInfo& info) {
@@ -607,10 +604,7 @@ void install(consoleInfo& info) {
     {
         return;
     }
-    if(!nandio_unlock_writing())
-    {
-        return;
-    }
+	nand_WriteProtect(false);
     if(installUnlaunch(info, disableAllPatches,
                         enableSoundAndSplash ? splashSoundBinaryPatchPath : NULL,
                         customBgSpan))
@@ -624,9 +618,7 @@ void install(consoleInfo& info) {
     {
         messageBox("\x1B[31mError:\x1B[33m Install failed\n");
     }
-    nandio_lock_writing();
-    printf("Synchronizing FAT tables...\n");
-    nandio_synchronize_fats();
+	nand_WriteProtect(true);
 }
 
 void customBg() {
@@ -705,7 +697,7 @@ void doMainMenu(consoleInfo& info) {
 
 int main(int argc, char **argv)
 {
-    setup();
+	setup();
     checkStage2Supported();
 	setupNitrofs(argc, argv);
 
@@ -714,7 +706,7 @@ int main(int argc, char **argv)
     try {
         loadUnlaunchInstallerPatch();
 
-        consoleInfo info;
+		consoleInfo info;
 
         retrieveInstalledLauncherInfo(info);
 
@@ -750,10 +742,6 @@ int main(int argc, char **argv)
     }
 
 	clearScreen(&bottomScreen);
-	printf("Unmounting NAND...\n");
-	fatUnmount("nand:");
-	printf("Merging stages...\n");
-	nandio_shutdown();
 
 	fifoSendValue32(FIFO_USER_02, 0x54495845); // 'EXIT'
 

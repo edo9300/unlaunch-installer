@@ -20,10 +20,10 @@ bool choiceBox(const char* message)
 
 	clearScreen(&bottomScreen);
 
-	iprintf("\x1B[33m");	//yellow
-	iprintf("%s\n", message);
-	iprintf("\x1B[47m");	//white
-	iprintf("\x1b[%d;0H\tYes\n\tNo\n", choiceRow);
+	printf("\x1B[33m");	//yellow
+	printf("%s\n", message);
+	printf("\x1B[47m");	//white
+	printf("\x1b[%d;0H\tYes\n\tNo\n", choiceRow);
 
 	while (!programEnd)
 	{
@@ -31,13 +31,13 @@ bool choiceBox(const char* message)
 		scanKeys();
 
 		//Clear cursor
-		iprintf("\x1b[%d;0H ", choiceRow + cursor);
+		printf("\x1b[%d;0H ", choiceRow + cursor);
 
 		if (keysDown() & (KEY_UP | KEY_DOWN))
 			cursor = !cursor;
 
 		//Print cursor
-		iprintf("\x1b[%d;0H>", choiceRow + cursor);
+		printf("\x1b[%d;0H>", choiceRow + cursor);
 
 		if (keysDown() & (KEY_A | KEY_START))
 			break;
@@ -57,10 +57,10 @@ bool choicePrint(const char* message)
 {
 	bool choice = NO;
 
-	iprintf("\x1B[33m");	//yellow
-	iprintf("\n%s\n", message);
-	iprintf("\x1B[47m");	//white
-	iprintf("Yes - [A]\nNo  - [B]\n");
+	printf("\x1B[33m");	//yellow
+	printf("\n%s\n", message);
+	printf("\x1B[47m");	//white
+	printf("Yes - [A]\nNo  - [B]\n");
 
 	while (!programEnd)
 	{
@@ -100,10 +100,10 @@ bool randomConfirmBox(const char* message)
 
 	clearScreen(&bottomScreen);
 
-	iprintf("\x1B[43m");	//yellow
-	iprintf("%s\n", message);
-	iprintf("\x1B[47m");	//white
-	iprintf("\n<START> cancel\n");
+	printf("\x1B[43m");	//yellow
+	printf("%s\n", message);
+	printf("\x1B[47m");	//white
+	printf("\n<START> cancel\n");
 
 	while (!programEnd && sequencePosition < sizeof(sequence))
 	{
@@ -111,11 +111,11 @@ bool randomConfirmBox(const char* message)
 		scanKeys();
 
 		//Print sequence
-		iprintf("\x1b[%d;0H", choiceRow);
+		printf("\x1b[%d;0H", choiceRow);
 		for (int i = 0; i < sizeof(sequence); i++)
 		{
-			iprintf("\x1B[%0om", i < sequencePosition ? 032 : 047);
-			iprintf("%s ", keysLabels[sequence[i]]);
+			printf("\x1B[%0om", i < sequencePosition ? 032 : 047);
+			printf("%s ", keysLabels[sequence[i]]);
 		}
 
 		if (keysDown() & (KEY_UP | KEY_DOWN | KEY_RIGHT | KEY_LEFT | KEY_A | KEY_B | KEY_X | KEY_Y))
@@ -145,8 +145,8 @@ void messageBox(const char* message)
 
 void messagePrint(const char* message)
 {
-	iprintf("%s\n", message);
-	iprintf("\nOkay - [A]\n");
+	printf("%s\n", message);
+	printf("\nOkay - [A]\n");
 
 	while (!programEnd)
 	{

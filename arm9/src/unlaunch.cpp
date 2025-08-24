@@ -57,7 +57,7 @@ bool isValidUnlaunchInstallerSize(size_t size)
 
 static bool removeHnaaLauncher()
 {
-    auto* errString = [] -> const char* {
+	auto errString = [] -> std::string {
         if(fileExists(hnaaTmdPath)) {
             if(!toggleFileReadOnly(hnaaTmdPath, false))
             {
@@ -70,17 +70,17 @@ static bool removeHnaaLauncher()
         }
 		if(!removeIfExists("nand:/title/00030017/484e4141/content"))
 		{
-			return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's content folder\n";
+			return std::format("\x1B[31mError:\x1B[33m Failed to delete ulnaunch's content folder: {}\n", errno);
 		}
 		if(!removeIfExists("nand:/title/00030017/484e4141"))
 		{
-			return "\x1B[31mError:\x1B[33m Failed to delete ulnaunch's 484e4141 folder\n";
+			return std::format("\x1B[31mError:\x1B[33m Failed to delete ulnaunch's 484e4141 folder: {}\n", errno);
 		}
-		return nullptr;
+		return "";
 	}();
-	if(errString)
+	if(errString.size())
 	{
-		messageBox(errString);
+		messageBox(errString.data());
 		return false;
 	}
 	return true;
@@ -492,7 +492,7 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSou
 	tonccpy(unlaunchInstallerBuffer, ogUnlaunchInstallerBuffer, sizeof(unlaunchInstallerBuffer));
     if (splashSoundBinaryPatchPath)
     {
-        iprintf("Applying splash and sound patch\n");
+		printf("Applying splash and sound patch\n");
         if(!applyBinaryPatch(splashSoundBinaryPatchPath))
         {
             return false;
@@ -504,7 +504,7 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSou
             const char newID[]{'S','A','N'};
             memcpy((unlaunchInstallerBuffer + 520) + patchOffset, newID, 3);
         }
-        iprintf("Applying Device list patch\n");
+		printf("Applying Device list patch\n");
         if(!applyBinaryPatch("nitro:/fix-devicelist-patch.bin"))
         {
             return false;

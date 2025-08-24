@@ -27,12 +27,11 @@
 		distribution.
 
 ---------------------------------------------------------------------------------*/
-#include "deviceList.h"
 #include <nds.h>
 #include <string.h>
 
 //---------------------------------------------------------------------------------
-void VcountHandler()
+void VblankHandler()
 //---------------------------------------------------------------------------------
 {
 	inputGetAndSend();
@@ -62,120 +61,32 @@ TWL_CODE void i2cIRQHandlerCustom()
 	}
 }
 
-void set_ctr(u32* ctr)
-{
-	for (int i = 0; i < 4; i++) REG_AES_IV[i] = ctr[3-i];
-}
-
-// 10 11  22 23 24 25
-//this is sort of a bodged together dsi aes function adapted from this 3ds function
-//https://github.com/TiniVi/AHPCFW/blob/master/source/aes.c#L42
-//as long as the output changes when keyslot values change, it's good enough.
-void aes(void* in, void* out, void* iv, u32 method)
-{
-	REG_AES_CNT = ( AES_CNT_MODE(method) |
-					AES_WRFIFO_FLUSH |
-					AES_RDFIFO_FLUSH |
-					AES_CNT_KEY_APPLY |
-					AES_CNT_KEYSLOT(3) |
-					AES_CNT_DMA_WRITE_SIZE(2) |
-					AES_CNT_DMA_READ_SIZE(1)
-					);
-
-	if (iv != NULL) set_ctr((u32*)iv);
-	REG_AES_BLKCNT = (1 << 16);
-	REG_AES_CNT |= 0x80000000;
-
-	for (int j = 0; j < 0x10; j+=4) REG_AES_WRFIFO = *((u32*)(in+j));
-	while (((REG_AES_CNT >> 0x5) & 0x1F) < 0x4); //wait for every word to get processed
-	for (int j = 0; j < 0x10; j+=4) *((u32*)(out+j)) = REG_AES_RDFIFO;
-	//REG_AES_CNT &= ~0x80000000;
-	//if (method & (AES_CTR_DECRYPT | AES_CTR_ENCRYPT)) add_ctr((u8*)iv);
-}
-
-#define DEVICE_LIST_SENTINEL *(vu32*)0x02300020
-
 //---------------------------------------------------------------------------------
 int main()
 //---------------------------------------------------------------------------------
 {
-	DEVICE_LIST_SENTINEL = 0;
-	// clear sound registers
-	dmaFillWords(0, (void*)0x04000400, 0x100);
-
-	REG_SOUNDCNT |= SOUND_ENABLE;
-	writePowerManagement(PM_CONTROL_REG, ( readPowerManagement(PM_CONTROL_REG) & ~PM_SOUND_MUTE ) | PM_SOUND_AMP );
-	powerOn(POWER_SOUND);
-
 	readUserSettings();
-	ledBlink(0);
+	ledBlink(LED_ALWAYS_ON);
 
 	irqInit();
 	irqSetAUX(IRQ_I2C, i2cIRQHandlerCustom);
-	// Start the RTC tracking IRQ
-	initClockIRQ();
 	fifoInit();
-	touchInit();
 
-	if (isDSiMode() /*|| ((REG_SCFG_EXT & BIT(17)) && (REG_SCFG_EXT & BIT(18)))*/)
+	if (isDSiMode())
 	{
-		if(__DeviceList)
-			memmove((vu8*)0x02300024, __DeviceList, sizeof(DeviceList));
-		else
-			memset((vu8*)0x02300024, 0, sizeof(DeviceList));
-		DEVICE_LIST_SENTINEL = 1;
-		
-		vu8 *out=(vu8*)0x02300000;
-		memset(out, 0, 16);
+		*((vu64*)0x02300000) = getConsoleID();
 
-		// first check whether we can read the console ID directly and it was not hidden by SCFG
-		if (((*(vu16*)0x04004000) & (1u << 10)) == 0 && ((*(vu8*)0x04004D08) & 0x1) == 0)
-		{
-			// The console id registers are readable, so use them!
-			memcpy(out, (vu8*)0x04004D00, 8);
-		}
-		if(out[0] == 0 || out[1] == 0) {
-			// For getting ConsoleID without reading from 0x4004D00...
-			u8 base[16]={0};
-			u8 in[16]={0};
-			u8 iv[16]={0};
-			u8 *scratch=(u8*)0x02300200;
-			u8 *key3=(u8*)0x40044D0;
-
-			aes(in, base, iv, 2);
-
-			//write consecutive 0-255 values to any byte in key3 until we get the same aes output as "base" above - this reveals the hidden byte. this way we can uncover all 16 bytes of the key3 normalkey pretty easily.
-			//greets to Martin Korth for this trick https://problemkaputt.de/gbatek.htm#dsiaesioports (Reading Write-Only Values)
-			for (int i=0;i<16;i++)
-			{
-				for (int j=0;j<256;j++)
-				{
-					*(key3+i)=j & 0xFF;
-					aes(in, scratch, iv, 2);
-					if (!memcmp(scratch, base, 16))
-					{
-						out[i]=j;
-						//hit++;
-						break;
-					}
-				}
-			}
-		}
-
-		sdmmc_controller_init(false);
-		sdmmc_nand_init();
-		sdmmc_nand_cid((u32*)0x2FFD7BC);	// Get eMMC CID
+		SDMMC_init(SDMMC_DEV_eMMC);
+		SDMMC_getCidRaw(SDMMC_DEV_eMMC, (vu32*)0x2FFD7BC);
 	}
-
-	SetYtrigger(80);
-
-	installSoundFIFO();
+	
+	fifoSendValue32(FIFO_USER_02, 42);
 
 	installSystemFIFO();
 
-	irqSet(IRQ_VCOUNT, VcountHandler);
+	irqSet(IRQ_VBLANK, VblankHandler);
 
-	irqEnable( IRQ_VBLANK | IRQ_VCOUNT | IRQ_NETWORK);
+	irqEnable(IRQ_VBLANK);
 
 	// Keep the ARM7 mostly idle
 	int oldBatteryStatus = 0;
