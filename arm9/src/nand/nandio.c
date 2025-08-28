@@ -6,9 +6,7 @@
 #include <stdbool.h>
 #include "crypto.h"
 #include "sector0.h"
-#include "f_xy.h"
 #include "nandio.h"
-#include "u128_math.h"
 
 #define STAGE2_HEADER_SECTOR 1
 #define NOCASH_FOOTER_SECTOR 2044
@@ -49,30 +47,11 @@ void getCID(u8 *CID)
 
 void getConsoleID(u8 *consoleID)
 {
-	vu8 *fifo=(vu8*)0x02300000; //shared mem address that has our computed key3 stuff
-	u8 key[16]; //key3 normalkey - keyslot 3 is used for DSi/twln NAND crypto
-	u8 key_x[16];////key3_x - contains a DSi console id (which just happens to be the LFCS on 3ds)
-
-	u8 empty_buff[8] = {0};
-	//receive the goods from arm7
-	for(size_t i = 0; i < 16; ++i)
+	vu8 *fifo=(vu8*)0x02300000; //shared mem address that has the retrieved console id
+	for(size_t i = 0; i < 8; ++i)
 	{
-		key[i] = fifo[i];
+		consoleID[i] = fifo[i];
 	}
-	
-	if(memcmp(key + 8, empty_buff, 8) == 0)
-	{
-		//we got the consoleid directly or nothing at all, don't treat this as key3 output
-		memcpy(consoleID, key, 8);
-		return;
-	}
-
-	F_XY_reverse(key, key_x); //work backwards from the normalkey to get key_x that has the consoleID
-
-	u128_xor(key_x, DSi_NAND_KEY_Y);
-
-	memcpy(&consoleID[0], &key_x[0], 4);
-	memcpy(&consoleID[4], &key_x[0xC], 4);
 }
 
 bool nandio_startup()
