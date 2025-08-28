@@ -3,6 +3,8 @@
 #include <string.h>
 #include <nds.h>
 
+// aes key constant value
+// 0xFFFEFB4E295902582A680F5F1A4F3E79
 static const uint8_t DSi_KEY_MAGIC[16] = {
 	0x79, 0x3e, 0x4f, 0x1a, 0x5f, 0x0f, 0x68, 0x2a,
 	0x58, 0x02, 0x59, 0x29, 0x4e, 0xfb, 0xfe, 0xff
@@ -96,7 +98,7 @@ static void F_XY_reverse(const uint8_t *key, uint8_t *key_xy)
 void getConsoleID(volatile uint8_t ConsoleIdOut[8])
 {
 	// first check whether we can read the console ID directly and it was not hidden by SCFG
-	if (false && (REG_SCFG_ROM & (1u << 10)) == 0 && ((*(volatile uint8_t*)0x04004D08) & 0x1) == 0)
+	if ((REG_SCFG_ROM & (1u << 10)) == 0 && ((*(volatile uint8_t*)0x04004D08) & 0x1) == 0)
 	{
 		// The console id registers are readable, so use them!
 		uint64_t consoleId = REG_CONSOLEID;
@@ -104,7 +106,7 @@ void getConsoleID(volatile uint8_t ConsoleIdOut[8])
 			ConsoleIdOut[i] = consoleId & 0xFF;
 			consoleId >>= 8;
 		}
-		if(out[0] != 0 && out[1] != 0)
+		if(ConsoleIdOut[0] != 0 && ConsoleIdOut[1] != 0)
 			return;
 	}
 	// For getting ConsoleID without reading from 0x4004D00...
