@@ -245,6 +245,11 @@ void setup() {
     {
         messageBox("fatInitDefault()...\x1B[31mFailed\n\x1B[47m");
 	}
+	
+	if(!fileExists(NAND("")))
+    {
+        messageBox("\x1B[31mFailed to mount NAND\n\x1B[47m");
+	}
 
     u32 clusterSize = getClusterSizeForPartition("sd:/");
 	if(clusterSize > 32768)
