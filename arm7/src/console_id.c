@@ -63,7 +63,7 @@ void computeConsoleIdFromKeyX(aes_keyslot_t* keyslot, volatile uint8_t ConsoleId
 void getConsoleID(volatile uint8_t ConsoleIdOut[8])
 {
 	// always "enable" the keyslot 3 for nand crypto, so that the keys are properly derived
-	((volatile  uint32_t*)(AES_KEYSLOT3.key_y))[3] = 0x0500A0E1;
+	((volatile  uint32_t*)(AES_KEYSLOT3.key_y))[3] = 0xE1A00005;
 	// first check whether we can read the console ID directly and it was not hidden by SCFG
 	if ((REG_SCFG_ROM & (1u << 10)) == 0 && ((*(volatile uint8_t*)0x04004D08) & 0x1) == 0)
 	{
