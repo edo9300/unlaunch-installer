@@ -49,18 +49,22 @@ sell/trade you console in the future and the new owner uses the official
 installer, they'll be protected from bricks.
 
 ## Patches applied to unlaunch
-The installer ships with 2 binary patches, one is an "ahestetic" one to enable
+The installer ships with 3 binary patches (one disabled), one is an "ahestetic" one to enable
 the dsi H&S screen and sound.
-The other is a mandatory one, required to make unlaunch properly use the tmd that
+~~The other is a mandatory one, required to make unlaunch properly use the tmd that
 was installed in the HNAA folder, otherwise it would attempt to save its settings
 to random fat blocks, since it assumes that unlaunch is installed in the blocks right
-after the title.tmd associated with the launcher read from HWINFO_S.
+after the title.tmd associated with the launcher read from HWINFO_S.~~
 More specifically, the sound and splash patch modifies the arm7 instruction of unlaunch at
 address 0x1308 (in the then relocated code it is run at 0x23fe038). The patched instruction
 is a `bl` to the function patching a second binary blob of the launcher, and is replaced with
 a nop.
+The third patch, is to fix the a wrong behaviour regarding homebrew booting and passing to them
+the directory they were in.
+The patch replaces a beq at file offset `0x2cf0` (0x06026980 when executed) with a nop.
+The replace check is for the rom's tid to be of "dsiware" (which almost no homebrew is)
 
-# This patch is currently not used because it breaks system titles launching
+## This patch is currently not used because it breaks system titles launching
 The other patch, modifies the code responsible for reading the launcher title id from HWINFO.
 The original code is as follow
 ```

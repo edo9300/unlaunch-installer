@@ -504,13 +504,11 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSou
             const char newID[]{'S','A','N'};
             memcpy((unlaunchInstallerBuffer + 520) + patchOffset, newID, 3);
         }
-#if 0
-        iprintf("Applying HNAA patch\n");
-        if(!applyBinaryPatch("nitro:/force-hnaa-patch.bin"))
+        iprintf("Applying Device list patch\n");
+        if(!applyBinaryPatch("nitro:/fix-devicelist-patch.bin"))
         {
             return false;
         }
-#endif
     }
 	if(!patchCustomBackground(customBackground))
 	{
