@@ -63,7 +63,7 @@ std::optional<std::span<uint8_t>> backgroundMenu()
 		addMenuItem(m, bgName.data(), nullptr, true, false);	
 	}
 	addMenuItem(m, "Default", nullptr, true, false);
-	addMenuItem(m, "Cancel", nullptr, true, false);
+	// addMenuItem(m, "Cancel", nullptr, true, false);
 
 	m->cursor = 0;
 
