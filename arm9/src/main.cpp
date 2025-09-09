@@ -644,6 +644,7 @@ void customBg() {
 
 void doMainMenu(consoleInfo& info) {
     int cursor = 0;
+    customBgSpan = {};
     while(!programEnd)
     {
         cursor = mainMenu(info, cursor);
