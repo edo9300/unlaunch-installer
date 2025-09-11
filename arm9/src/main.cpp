@@ -345,7 +345,7 @@ bool writeNocashFooter(consoleInfo& info) {
 
 void waitForBatteryChargedEnough() {
 
-    while (batteryLevel < 7 && !charging)
+    while (batteryLevel < 7 && !charging && !programEnd)
     {
         if (choiceBox("\x1B[47mBattery is too low!\nPlease plug in the console.\n\nContinue?") == NO)
             exit(0);
