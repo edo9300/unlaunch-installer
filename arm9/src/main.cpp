@@ -34,6 +34,7 @@ volatile bool charging = false;
 volatile u8 batteryLevel = 0;
 static bool advancedOptionsUnlocked = false;
 static bool isLauncherVersionSupported = true;
+static bool fatTouched = false;
 
 PrintConsole topScreen;
 PrintConsole bottomScreen;
@@ -567,6 +568,7 @@ void uninstall(consoleInfo& info, bool noBackup) {
         info.tmdPatched = false;
         info.tmdGood = true;
         info.UnlaunchHNAAtmdFound = !unsafeUninstall;
+		fatTouched = true;
     }
     else
     {
@@ -613,6 +615,7 @@ void install(consoleInfo& info) {
         info.tmdGood = false;
         info.tmdPatched = true;
         info.UnlaunchHNAAtmdFound = true;
+		fatTouched = true;
     }
     else
     {
@@ -740,6 +743,11 @@ int main(int argc, char **argv)
     } catch (const std::exception& e) {
         messageBox(e.what());
     }
+
+	if(fatTouched) {
+        printf("Synchronizing FAT tables...\n");
+        nandio_synchronize_fats();
+	}
 
 	clearScreen(&bottomScreen);
 
