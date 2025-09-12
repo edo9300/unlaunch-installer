@@ -282,7 +282,7 @@ void checkStage2Supported() {
     exit(0);
 }
 
-void setupNitrofs(int argc, char **argv) {
+void setupNitrofs() {
 	for(const auto& path : {std::string_view{}, "sd:/ntrboot.nds"sv, "sd:/boot.nds"sv}) {
 		if(!nitroFSInit(path.data()))
 			continue;
@@ -696,7 +696,7 @@ int main(int argc, char **argv)
 {
 	setup();
     checkStage2Supported();
-	setupNitrofs(argc, argv);
+	setupNitrofs();
 
     loadUnlaunchInstaller();
 
