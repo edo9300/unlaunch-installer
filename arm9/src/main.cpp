@@ -282,14 +282,8 @@ void checkStage2Supported() {
     exit(0);
 }
 
-std::vector<std::string_view> getInstallerPaths(int argc, char **argv) {
-	if(argc > 0)
-		return {std::string_view{argv[0]}};
-	return {"sd:/ntrboot.nds", "sd:/boot.nds"};
-}
-
-void setupNitrofs(int argc, char **argv) {
-	for(const auto& path : getInstallerPaths(argc, argv)){
+void setupNitrofs() {
+	for(const auto& path : {std::string_view{}, "sd:/ntrboot.nds"sv, "sd:/boot.nds"sv}) {
 		if(!nitroFSInit(path.data()))
 			continue;
 		auto* file = fopen("nitro:/installer.ver", "rb");
@@ -702,7 +696,7 @@ int main(int argc, char **argv)
 {
 	setup();
     checkStage2Supported();
-	setupNitrofs(argc, argv);
+	setupNitrofs();
 
     loadUnlaunchInstaller();
 
