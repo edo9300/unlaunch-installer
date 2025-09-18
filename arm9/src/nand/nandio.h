@@ -8,7 +8,6 @@
 extern "C" {
 #endif
 
-extern void nandio_construct_nocash_footer(NocashFooter* footer);
 extern bool nandio_read_nocash_footer(NocashFooter* footer);
 extern bool nandio_write_nocash_footer(NocashFooter* footer);
 

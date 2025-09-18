@@ -58,10 +58,15 @@ int main()
 
 	if (isDSiMode())
 	{
-		*((vu64*)0x02300000) = getConsoleID();
+		struct {
+			u64 consoleId;
+			u32 cid[4];
+		} consoleIdAndCid;
+		consoleIdAndCid.consoleId = getConsoleID();
 
 		SDMMC_init(SDMMC_DEV_eMMC);
-		SDMMC_getCidRaw(SDMMC_DEV_eMMC, (vu32*)0x2FFD7BC);
+		SDMMC_getCidRaw(SDMMC_DEV_eMMC, consoleIdAndCid.cid);
+		fifoSendDatamsg(FIFO_USER_02, sizeof(consoleIdAndCid), (u8*)&consoleIdAndCid);
 	}
 	
 	fifoSendValue32(FIFO_USER_02, 42);

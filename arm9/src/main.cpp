@@ -40,6 +40,11 @@ PrintConsole bottomScreen;
 int bgGifTop;
 int bgGifBottom;
 
+static struct {
+	uint64_t consoleId;
+	uint32_t cid[4];
+} consoleIdAndCid;
+
 struct Stage2 {
     Sha1Digest sha;
     bool unlaunch_supported;
@@ -224,12 +229,8 @@ void setup() {
         exit(0);
 	}
 
-	while(1){
-		if(fifoCheckValue32(FIFO_USER_02)) {  //checking to see when that plucky little arm7 has finished its consoleID magic
-			break;
-		}
-		swiWaitForVBlank();
-	}
+	fifoWaitDatamsg(FIFO_USER_02);
+	fifoGetDatamsg(FIFO_USER_02, sizeof(consoleIdAndCid), (u8*)&consoleIdAndCid);
 
 	//setup sd card and nand access
 	if (!fatInitDefault())
@@ -297,7 +298,7 @@ void checkNocashFooter(consoleInfo& info) {
     NocashFooter footer;
 
     nandio_read_nocash_footer(&footer);
-    nandio_construct_nocash_footer(&info.nocashFooter);
+	constructNocashFooter(&info.nocashFooter, (u8*)consoleIdAndCid.cid, (u8*)&consoleIdAndCid.consoleId);
 
     info.needsNocashFooterToBeWritten = !isFooterValid(&footer);
 

@@ -36,35 +36,6 @@ static_assert(sizeof(mbr_t) == 512);
 
 static u8 sector_buf[SECTOR_SIZE] __attribute__((aligned(4)));
 
-void getCID(u8 *CID)
-{
-	vu8* CIDbuff = (vu8*)0x2FFD7BC;
-	for(int i = 0; i < 16; ++i)
-	{
-		CID[i] = CIDbuff[i];
-	}
-}
-
-void getConsoleID(u8 *consoleID)
-{
-	vu8 *fifo=(vu8*)0x02300000;
-	for(size_t i = 0; i < 8; ++i)
-	{
-		consoleID[i] = fifo[i];
-	}
-}
-
-void nandio_construct_nocash_footer(NocashFooter* footer)
-{	
-	u8 CID[16];
-	u8 consoleID[8];
-	
-	getCID(CID);
-	getConsoleID(consoleID);
-	
-	constructNocashFooter(footer, CID, consoleID);
-}
-
 bool nandio_read_nocash_footer(NocashFooter* footer)
 {
 	if(!nand_ReadSectors(NOCASH_FOOTER_SECTOR, 1, sector_buf))
