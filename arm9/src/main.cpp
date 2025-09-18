@@ -30,8 +30,6 @@ static bool disableAllPatches = false;
 static bool enableSoundAndSplash = false;
 static const char* splashSoundBinaryPatchPath = NULL;
 static std::span<uint8_t> customBgSpan{};
-volatile bool charging = false;
-volatile u8 batteryLevel = 0;
 static bool advancedOptionsUnlocked = false;
 static bool isLauncherVersionSupported = true;
 static bool fatTouched = false;
@@ -218,10 +216,6 @@ void setup() {
         programEnd = true;
         arm7Exiting = true;
     }, NULL);
-    fifoSetValue32Handler(FIFO_USER_03, [](u32 value32, void*) {
-        batteryLevel = value32 & 0xF;
-        charging = (value32 & BIT(7)) != 0;
-    }, NULL);
 
     //DSi check
     if (!isDSiMode())
@@ -341,8 +335,9 @@ bool writeNocashFooter(consoleInfo& info) {
 }
 
 void waitForBatteryChargedEnough() {
-
-    while (batteryLevel < 7 && !charging && !programEnd)
+	// 7 is 2 battery bars, require at least that, if charger is plugged in
+	// bit 7 will be set, making this value greater than 7
+    while (getBatteryLevel() < 7 && !programEnd)
     {
         if (choiceBox("\x1B[47mBattery is too low!\nPlease plug in the console.\n\nContinue?") == NO)
             exit(0);
