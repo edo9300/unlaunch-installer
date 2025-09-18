@@ -56,7 +56,6 @@ int main()
 	// Tell ARM9 to safely exit
 	fifoSendValue32(FIFO_USER_01, 0x54495845); // 'EXIT'
 	fifoWaitValue32(FIFO_USER_02);
-	fifoCheckValue32(FIFO_USER_02);
 
 	if (reboot)
 	{
