@@ -1,10 +1,6 @@
 # "Safe" unlaunch installer
 A basic homebrew with a single job, install and uninstall unlaunch from a console.
 
-## WARNING
-This can modify your internal system NAND! There is *always* a risk of
-**bricking**, albeit small, when you modify NAND. Please proceed with caution.
-
 ## Features
 - Safety checks to install and uninstall unlaunch without a risk of bricking
 - Fully compatible with older unlaunch installs
@@ -12,17 +8,17 @@ This can modify your internal system NAND! There is *always* a risk of
 - Keeps a recovery copy of unlaunch in NAND to protect against future bricks
   (only on retail consoles)
 
-## Notes
-This installer comes bundled with a specific version of unlaunch (2.0), but can
-load a separate unlaunch installer from the root of the sd card, named
-`unlaunch.dsi`.
+## Building
+Blocksds 1.14.2 or later is required, once set up, just run `make` in the root folder.
 
-Supported unlaunch versions are 1.8, 1.9 and 2.0, since earlier ones don't work
-if installed with this new method.
+## Notes
+This installer only supports installing unlaunch 2.0 (which comes bundled with the nds),
+since there are binary patched applied that for ease of use are only implemented for that
+version.
 
 Due to some unforunate version differences, the install method used by this
-application won't be usable on consoles with firmware 1.4.2 (1.4.3 for china).
-So installing on consoles that ship that version will be prevented
+application won't be usable on consoles with firmware 1.4.2 (1.4.3 for china and korea).
+So installing on consoles that ship that version won't be allowed
 
 ## Differences with official installer
 The Nintendo DSi's stage2 has a failsafe where it will load a backup launcher
@@ -154,11 +150,11 @@ ram at address `0x6029d38`.
 The lzss compressed arm7 payload is found at offset `0x8580` for unlaunch 2.0 with a length of `0x67FD`.
 
 ## Credits
-- [DevkitPro](https://devkitpro.org/): devkitARM and libnds
+- [AntonioND](https://github.com/AntonioND/): for [blocksds](https://blocksds.skylyrac.net/)
 - [Martin Korth (nocash)](https://problemkaputt.de):
-  [GBATEK](https://problemkaputt.de/gbatek.htm)
+  [GBATEK](https://problemkaputt.de/gbatek.htm) and [UNLAUNCH](https://problemkaputt.de/unlaunch.htm) itself.
 - [JeffRuLz](https://github.com/JeffRuLz)/[Epicpkmn11](https://github.com/Epicpkmn11):
   [TMFH](https://github.com/JeffRuLz/TMFH)/[NTM](https://github.com/Epicpkmn11/NTM)
-  (what this is project used as base for menus and other things)
+  (what this is project used as base for menus)
 - [rvtr](https://github.com/rvtr):
    Adding support for installing to dev/proto consoles and the ( ͡° ͜ʖ ͡°) icon
