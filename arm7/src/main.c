@@ -30,21 +30,10 @@
 #include <nds.h>
 #include <string.h>
 
-//---------------------------------------------------------------------------------
-void VblankHandler()
-//---------------------------------------------------------------------------------
-{
-	inputGetAndSend();
-}
-
 volatile bool exitflag = false;
 volatile bool reboot = false;
 
-// Custom POWER button handling, based on the default function:
-// https://github.com/devkitPro/libnds/blob/154a21cc3d57716f773ff2b10f815511c1b8ba9f/source/common/interrupts.c#L51-L69
-//---------------------------------------------------------------------------------
 TWL_CODE void i2cIRQHandlerCustom()
-//---------------------------------------------------------------------------------
 {
 	int cause = (i2cReadRegister(I2C_PM, I2CREGPM_PWRIF) & 0x3) | (i2cReadRegister(I2C_GPIO, 0x02)<<2);
 
@@ -61,13 +50,8 @@ TWL_CODE void i2cIRQHandlerCustom()
 	}
 }
 
-//---------------------------------------------------------------------------------
 int main()
-//---------------------------------------------------------------------------------
 {
-	readUserSettings();
-	ledBlink(LED_ALWAYS_ON);
-
 	irqInit();
 	irqSetAUX(IRQ_I2C, i2cIRQHandlerCustom);
 	fifoInit();
@@ -84,7 +68,7 @@ int main()
 
 	installSystemFIFO();
 
-	irqSet(IRQ_VBLANK, VblankHandler);
+	irqSet(IRQ_VBLANK, inputGetAndSend);
 
 	irqEnable(IRQ_VBLANK);
 
