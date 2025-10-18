@@ -17,6 +17,17 @@ GAME_ICON	:= icon.bmp
 GAME_CODE		:= UNLI
 GAME_LABEL		:= UNLINS
 
+# Version check
+
+BLOCKSDS_VERSION_FILE = $(BLOCKSDS)/libs/version/blocksds_version.make
+
+ifeq ("$(wildcard $(BLOCKSDS_VERSION_FILE))","")
+$(error BlocksDS version too old. Please update.)
+endif
+
+include $(BLOCKSDS_VERSION_FILE)
+
+$(eval $(call error_if_blocksds_version_less_than, 1, 15, 2))
 # Source code paths
 # -----------------
 
@@ -60,7 +71,7 @@ clean:
 	@echo "  CLEAN"
 	$(V)$(MAKE) -f Makefile.arm9 clean --no-print-directory
 	$(V)$(MAKE) -f Makefile.arm7 clean --no-print-directory
-	$(V)$(RM) $(ROM) build ntrboot.nds
+	$(V)$(RM) $(ROM) build ntrboot.nds boot.nds
 
 arm9:
 	$(V)+$(MAKE) -f Makefile.arm9 --no-print-directory
@@ -92,3 +103,4 @@ $(ROM): arm9 arm7
 		-b $(GAME_ICON) "$(GAME_FULL_TITLE)" \
 		$(NDSTOOL_ARGS)
 	$(V)cp $(ROM) ntrboot.nds
+	$(V)cp $(ROM) boot.nds

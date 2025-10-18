@@ -15,7 +15,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: skylyrac/blocksds:slim-v1.15.0
+    container: skylyrac/blocksds:slim-v1.15.3
     name: Build with Docker using blocksds
     steps:
       - name: Checkout repo
