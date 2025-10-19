@@ -4,7 +4,6 @@
 #include <format>
 #include <exception>
 #include <memory>
-#include <vector>
 
 #include <filesystem.h>
 #include <nds/arm9/dldi.h>

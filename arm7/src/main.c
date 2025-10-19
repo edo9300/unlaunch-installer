@@ -25,6 +25,7 @@ int main()
 	irqInit();
 	irqSetAUX(IRQ_I2C, i2cIRQHandlerCustom);
 	fifoInit();
+	initClockIRQTimer(3);
 
 	struct {
 		u64 consoleId;
