@@ -83,8 +83,7 @@ std::optional<std::span<uint8_t>> backgroundMenu()
 				break;
 			else if(keys & KEY_B)
 			{
-				m->cursor = bgs.size() + 1;
-				break;
+				return {};
 			}
 		}
 
