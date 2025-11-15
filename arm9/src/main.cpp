@@ -242,6 +242,23 @@ void setup() {
         messageBox("\x1B[31mFailed to mount NAND\n\x1B[47m");
 	}
 
+	bool isMBR = []{
+		// good ol' "buffer being passed to the arm7"
+		static std::array<std::uint8_t, 512> secBuff;
+		get_io_dsisd()->readSectors(0, 1, secBuff.data());
+		return secBuff[510] == 0x55 && secBuff[511] == 0xAA;
+	}();
+
+	if(!isMBR)
+	{
+		messageBox("\x1B[41mWARNING:\x1B[47m This SD is not\n"
+				   "formatted as MBR, required by\n"
+				   "Unlaunch to work.\n"
+				   "If you install it, Unlaunch\n"
+				   "won't boot as long as this SD\n"
+				   "card is inserted.");
+	}
+
     u32 clusterSize = getClusterSizeForPartition("sd:/");
 	if(clusterSize > 32768)
     {
