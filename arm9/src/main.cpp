@@ -404,6 +404,7 @@ void parseLauncherInfo(std::string_view launcher_tid_str, consoleInfo& info) {
         dirent* pent;
         std::optional<std::pair<uint32_t, std::string>> foundApp;
         bool tmdFound;
+		std::string error_str = "Launcher app not found";
         while((pent = readdir(pdir.get())) != nullptr) {
             if(foundApp && tmdFound) {
                 break;
@@ -416,17 +417,32 @@ void parseLauncherInfo(std::string_view launcher_tid_str, consoleInfo& info) {
                 continue;
             }
 
-            if(filename.size() != 12 || !filename.ends_with(".app") || !filename.starts_with("0000000"))
+			if(filename.size() != 12 || !filename.ends_with(".app"))
                 continue;
 
-            auto launcher_app_version = static_cast<uint16_t>(static_cast<unsigned char>(filename[7]) - static_cast<unsigned char>('0'));
+			auto launcher_app_path = std::format("{}/{}", launcher_content_path, filename);
+			auto f = fopen(launcher_app_path.data(), "rb");
+			uint8_t buff[0x20];
+			auto read = fread(buff, 0x20, 1, f);
+			fclose(f);
+
+			static constexpr std::array<uint8_t, 0xF> hna
+				{'L','A','U','N','C','H','E','R','\0','\0','\0','\0','H','N','A'};
+
+			if(read != 1 || !std::ranges::equal(hna, std::span{buff, buff+0xF})) {
+				error_str.append(std::format("\ntried: {}", filename));
+				continue;
+			}
+
+			uint16_t launcher_app_version;
+			memcpy(&launcher_app_version, &buff[0x1E], 2);
             if(launcher_app_version > 7)
                 throw std::runtime_error(std::format("Found an unsupported launcher version: {}", launcher_app_version));
 
             foundApp = std::make_pair(static_cast<uint32_t>(256 * launcher_app_version), std::string{filename});
         }
         if(!foundApp)
-            throw std::runtime_error("Launcher app not found");
+			throw std::runtime_error(error_str);
         const auto& [launcher_build, launcher_app_name] = *foundApp;
         return std::make_tuple(tmdFound, launcher_build, std::format("{}/{}", launcher_content_path, launcher_app_name));
     }();
