@@ -135,7 +135,7 @@ unsigned long long readFileAll(FILE* f, void* outbuff, size_t len)
 	if(size > len)
 		return 0;
 	uint8_t* buff = (uint8_t*)outbuff;
-	size_t toRead = len;
+	size_t toRead = size;
 
 	size_t n = 0;
 	while (toRead != 0 && (n = fread(buff, sizeof(uint8_t), toRead, f)) > 0)
@@ -148,7 +148,7 @@ unsigned long long readFileAll(FILE* f, void* outbuff, size_t len)
 		return 0;
 	}
 
-	return len;
+	return size;
 }
 
 unsigned long long getFileSize(FILE* f)
