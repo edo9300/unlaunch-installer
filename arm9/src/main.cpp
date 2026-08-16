@@ -694,6 +694,10 @@ void doMainMenu(consoleInfo& info) {
 			{
 				break;
 			}
+			if(enableSoundAndSplash)
+			{
+				break;
+			}
 			if(!isLauncherVersionSupported || foundUnlaunchInstallerVersion != v2_0)
 			{
 				break;
