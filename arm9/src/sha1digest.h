@@ -2,6 +2,7 @@
 #define SHA1DIGEST_H
 
 #include <array>
+#include <cstdint>
 #include <string_view>
 
 static constexpr int SHA1_LEN = 20;
