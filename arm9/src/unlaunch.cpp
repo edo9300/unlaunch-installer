@@ -489,14 +489,12 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSou
 			return false;
 		}
 	} else {
+		const char* patchFile = "nitro:/fix-devicelist-patch.bin";
 		if(disableAllPatches) {
-			// change launcher TID from ANH to SAN so that unlaunch doesn't realize it's booting the launcher
-			auto patchOffset = blockAllPatchesOffset[installerVersion];
-			const char newID[]{'S','A','N'};
-			memcpy((unlaunchInstallerBuffer + 520) + patchOffset, newID, 3);
+			patchFile = "nitro:/fix-devicelist-patch-no-launcher-patches.bin";
 		}
 		printf("Applying Device list patch\n");
-		if(!applyBinaryPatch("nitro:/fix-devicelist-patch.bin"))
+		if(!applyBinaryPatch(patchFile))
 		{
 			return false;
 		}
