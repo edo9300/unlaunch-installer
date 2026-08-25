@@ -9,7 +9,8 @@ A basic homebrew with a single job, install and uninstall unlaunch from a consol
   (only on retail consoles)
 
 ## Building
-Blocksds 1.14.2 or later is required, once set up, just run `make` in the root folder.
+Blocksds 1.23.0 or later is required due to bugs in the `ftruncate` function,
+once set up, just run `make` in the root folder.
 
 ## Notes
 This installer only supports installing unlaunch 2.0 (which comes bundled with the nds),
