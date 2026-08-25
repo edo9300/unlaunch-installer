@@ -169,31 +169,39 @@ static bool restoreMainTmd(const consoleInfo& info, bool removeHNAABackup)
 
 static bool patchMainTmd(const char* path)
 {
-	FILE* launcherTmd = fopen(path, "r+b");
+	std::shared_ptr<FILE> launcherTmd{fopen(path, "r+b"), [](auto* ptr){ if(ptr) fclose(ptr);}};
 	if(!launcherTmd)
 	{
 		messageBox("\x1B[31mError:\x1B[33m Failed to open default launcher's title.tmd\n");
 		return false;
 	}
 	// Patches the title.tmd's title id from HNXX to GNXX
-	fseek(launcherTmd, 0x190, SEEK_SET);
+	fseek(launcherTmd.get(), 0x190, SEEK_SET);
 	char c;
-	fread(&c, 1, 1, launcherTmd);
+	fread(&c, 1, 1, launcherTmd.get());
 	//if byte is not already set, it's clean
 	if(c == 0x48)
 	{
-		fseek(launcherTmd, -1, SEEK_CUR);
+		fseek(launcherTmd.get(), -1, SEEK_CUR);
 		c = 0x47;
-		fwrite(&c, 1, 1, launcherTmd);
+		fwrite(&c, 1, 1, launcherTmd.get());
 	}
 	else if(c != 0x47)
 	{
 		messageBox("\x1B[31mError:\x1B[33m Default launcher's title.tmd was tamprered with, aborting\n");
-		fclose(launcherTmd);
 		return false;
 	}
 
-	fclose(launcherTmd);
+	// forces the tmd to reach the 16k (cluster) boundary, zeroes it, then trim it back
+	// this is to ensure that unlaunch will find the cluster empty when saving/reading the settings
+	errno = 0;
+	auto fd = fileno(launcherTmd.get());
+	fseek(launcherTmd.get(), 0, SEEK_SET);
+	ftruncate(fd, 0x4000);
+	fsync(fd);
+	ftruncate(fd, 520);
+	fsync(fd);
+
 	return true;
 }
 
