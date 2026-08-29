@@ -46,11 +46,17 @@ sell/trade you console in the future and the new owner uses the official
 installer, they'll be protected from bricks.
 
 ## Patches applied to unlaunch
-The installer ships with 4 binary patches:
- - Enable the dsi H&S screen and sound. This works by modifying
+The installer ships with 6 binary patches:
+ - Enable **both** the dsi H&S screen and sound. This works by modifying
  the arm7 instruction of unlaunch at address 0x1308 (in the then relocated code it is
  run at 0x23fe038). The patched instruction is a `bl` to the function patching a second
  binary blob of the launcher, and is replaced with a nop.
+ - Enable the dsi menu H&S screen **only**. This works by modifying
+ the patches to apply to the launcher's arm7i binary by only making unlaunch patch the code
+ disabling sound initialization.
+ - Enable the dsi menu sound **only**. This works by modifying
+ the patches to apply to the launcher's arm7i binary by only making unlaunch patch the code
+ disabling the display of the H&S screen.
  - ~~A mandatory one, required to make unlaunch properly use the tmd that
  was installed in the HNAA folder, otherwise it would attempt to save its settings
  to random fat blocks, since it assumes that unlaunch is installed in the blocks right
@@ -62,7 +68,32 @@ The replaced check is for the rom's tid to be of "dsiware" (which almost no home
  - Overwrites the dsi launcher detection logic to trick unlaunch into not patching it with its patches.
 The patch replaces a bleq at file offset `0x2f8` (0x06023f88 when executed) with a nop.
 The replaced jump is the call to the function that should take care of patching the loaded launcher binary.
-It also includes the above device list patch
+
+Every binary patch also includes the device list fix patch
+
+The patches are compressed with `$WONDERFUL_TOOLCHAIN/bin/wf-nnpack-lzss -evo`
+
+## Unlaunch binary patch format
+
+When booting the dsi launcher, unlaunch applies 2 set of binary patches to its arm9 and arm7i binaries
+(once decrypted from their modcrypt encryption).
+
+The patches are located at offset `0x154C`, with size `0x1C6` and `0x1712`, with size `0x3E` respectively.
+
+A single patch is structured as such:
+```
+u16 dataToMatchLength;
+u16 offsetInMatchedBlockToStartPatching;
+u16 dataToWriteLength;
+u16 dataToMatch[dataToMatchLength & 0x7FFF];
+u16 dataToWrite[dataToWriteLength];
+```
+a `dataToMatchLength` of `0` means there's no more blocks to parse.
+
+If a short to match is `0xAAAA`, that has to be interpreted as wildcard matching any pattern.
+
+In its patching code, unlaunch checks if bit `15` of `dataToMatchLength` is set, in which case it will skip
+that patch block unless a global variable at address `0x2FFFDF4` has the 2 lower bits clear (`*(u32)0x2FFFDF4 & 3 == 0`).
 
 ## This patch is currently not used because it breaks system titles launching
 The other patch, modifies the code responsible for reading the launcher title id from HWINFO.

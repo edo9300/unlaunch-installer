@@ -486,28 +486,31 @@ static bool applyBinaryPatch(const char* path)
 	return true;
 }
 
-static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSoundBinaryPatchPath, std::span<uint8_t> customBackground)
+static bool patchUnlaunchInstaller(const unlaunchInstallOptions& options)
 {
 	tonccpy(unlaunchInstallerBuffer, ogUnlaunchInstallerBuffer, sizeof(unlaunchInstallerBuffer));
-	if (splashSoundBinaryPatchPath)
-	{
-		printf("Applying splash and sound patch\n");
-		if(!applyBinaryPatch(splashSoundBinaryPatchPath))
-		{
-			return false;
-		}
+	const char* patchFile = nullptr;
+	if (options.noLauncherPatches) {
+		printf("Disabling launcher patches\n");
+		patchFile = "nitro:/patches/no-launcher-patches.bin";
+	} else if (options.disableHealthAndSafety && options.disableSound)	{
+		printf("Disabling H&S and DSi menu sound\n");
+		patchFile = "nitro:/patches/fix-devicelist.bin";
+	} else if (options.disableHealthAndSafety)	{
+		printf("Disabling H&S\n");
+		patchFile = "nitro:/patches/no-h&s.bin";
+	} else if (options.disableSound) {
+		printf("Disabling DSi menu sound\n");
+		patchFile = "nitro:/patches/no-sound.bin";
 	} else {
-		const char* patchFile = "nitro:/patches/fix-devicelist.bin";
-		if(disableAllPatches) {
-			patchFile = "nitro:/patches/no-launcher-patches.bin";
-		}
-		printf("Applying Device list patch\n");
-		if(!applyBinaryPatch(patchFile))
-		{
-			return false;
-		}
+		printf("Enabling H&S and DSi menu sound\n");
+		patchFile = "nitro:/patches/enable-sound-and-splash.bin";
 	}
-	if(!patchCustomBackground(customBackground))
+	if(!applyBinaryPatch(patchFile))
+	{
+		return false;
+	}
+	if(!patchCustomBackground(options.customBackground))
 	{
 		return false;
 	}
@@ -566,12 +569,12 @@ const char* getUnlaunchVersionString(UNLAUNCH_VERSION version)
 	return unlaunchVersionStrings[version];
 }
 
-bool installUnlaunch(const consoleInfo& info, bool disableAllPatches, const char* splashSoundBinaryPatchPath, std::span<uint8_t> customBackground)
+bool installUnlaunch(const consoleInfo& info, const unlaunchInstallOptions& options)
 {
 	if (installerVersion == INVALID)
 		return false;
 
-	if (installerVersion != CUSTOM && !patchUnlaunchInstaller(disableAllPatches, splashSoundBinaryPatchPath, customBackground))
+	if (installerVersion != CUSTOM && !patchUnlaunchInstaller(options))
 		return false;
 
 	// Treat protos differently

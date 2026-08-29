@@ -25,10 +25,12 @@ volatile bool programEnd = false;
 static volatile bool arm7Exiting = false;
 static bool retailLauncherTmdPresentAndToBePatched = true;
 static UNLAUNCH_VERSION foundUnlaunchInstallerVersion = INVALID;
-static bool disableAllPatches = false;
-static bool enableSoundAndSplash = false;
-static const char* splashSoundBinaryPatchPath = NULL;
-static std::span<uint8_t> customBgSpan{};
+unlaunchInstallOptions installOptions {
+	.noLauncherPatches = false,
+	.disableSound = false,
+	.disableHealthAndSafety = true,
+	.customBackground = {},
+};
 static bool advancedOptionsUnlocked = false;
 static bool isLauncherVersionSupported = true;
 static bool fatTouched = false;
@@ -70,7 +72,8 @@ static constexpr std::array knownStage2s{
 enum {
 	MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL,
 	MAIN_MENU_CUSTOM_BG,
-	MAIN_MENU_SOUND_SPLASH_PATCHES,
+	MAIN_MENU_SOUND_PATCHES,
+	MAIN_MENU_SPLASH_PATCHES,
 	MAIN_MENU_SAFE_UNLAUNCH_INSTALL,
 	MAIN_MENU_EXIT,
 	MAIN_MENU_SAFE_UNLAUNCH_UNINSTALL_NO_BACKUP,
@@ -126,11 +129,13 @@ static int mainMenu(const consoleInfo& info, int cursor)
 		return std::make_pair("Uninstall unlaunch", "Uninstall unlaunch no backup");
 	}();
 
-	char soundPatchesStr[64], tidPatchesStr[32], installUnlaunchStr[32];
+	char soundPatchesStr[64], splashPatchesStr[64], tidPatchesStr[32], installUnlaunchStr[32];
 	sprintf(tidPatchesStr, "Disable all patches: %s",
-						disableAllPatches ? "On" : "Off");
-	sprintf(soundPatchesStr, "Enable sound and splash: %s",
-							enableSoundAndSplash ? "On" : "Off");
+						installOptions.noLauncherPatches ? "On" : "Off");
+	sprintf(soundPatchesStr, "Disable DSi menu sound: %s",
+							installOptions.disableSound ? "On" : "Off");
+	sprintf(splashPatchesStr, "Disable DSi menu H&S: %s",
+							installOptions.disableHealthAndSafety ? "On" : "Off");
 	if(foundUnlaunchInstallerVersion != INVALID)
 	{
 		sprintf(installUnlaunchStr, "Install unlaunch (%s)", getUnlaunchVersionString(foundUnlaunchInstallerVersion));
@@ -141,7 +146,8 @@ static int mainMenu(const consoleInfo& info, int cursor)
 	}
 	addMenuItem(m, restore_string, NULL, !info.isStockTmd() && isLauncherVersionSupported, false);
 	addMenuItem(m, "Custom background", NULL, isInstallingRealUnlaunch, true);
-	addMenuItem(m, soundPatchesStr, NULL, isInstallingRealUnlaunch && !disableAllPatches && splashSoundBinaryPatchPath != NULL, false);
+	addMenuItem(m, soundPatchesStr, NULL, isInstallingRealUnlaunch && !installOptions.noLauncherPatches, false);
+	addMenuItem(m, splashPatchesStr, NULL, isInstallingRealUnlaunch && !installOptions.noLauncherPatches, false);
 	addMenuItem(m, installUnlaunchStr, NULL, foundUnlaunchInstallerVersion != INVALID && info.isStockTmd() && isLauncherVersionSupported, false);
 	addMenuItem(m, "Exit", NULL, true, false);
 	if(!isLauncherVersionSupported)
@@ -390,11 +396,20 @@ void loadUnlaunchInstaller() {
 }
 
 void loadUnlaunchInstallerPatch() {
-	if(fileExists("nitro:/patches/enable-sound-and-splash.bin")) {
-		splashSoundBinaryPatchPath = "nitro:/patches/enable-sound-and-splash.bin";
+	if(!fileExists("nitro:/patches/enable-sound-and-splash.bin")) {
+		throw std::runtime_error(std::format("Failed to find patch ({})", "nitro:/patches/enable-sound-and-splash.bin"));
+	}
+	if(!fileExists("nitro:/patches/no-h&s.bin")) {
+		throw std::runtime_error(std::format("Failed to find patch ({})", "nitro:/patches/no-h&s.bin"));
+	}
+	if(!fileExists("nitro:/patches/no-launcher-patches.bin")) {
+		throw std::runtime_error(std::format("Failed to find patch ({})", "nitro:/patches/no-launcher-patches.bin"));
+	}
+	if(!fileExists("nitro:/patches/no-sound.bin")) {
+		throw std::runtime_error(std::format("Failed to find patch ({})", "nitro:/patches/no-sound.bin"));
 	}
 	if(!fileExists("nitro:/patches/fix-devicelist.bin")) {
-		throw std::runtime_error(std::format("Failed to find device list patch ({})", "nitro:/patches/fix-devicelist.bin"));
+		throw std::runtime_error(std::format("Failed to find patch ({})", "nitro:/patches/fix-devicelist.bin"));
 	}
 }
 
@@ -633,9 +648,7 @@ void install(consoleInfo& info) {
 		return;
 	}
 	nand_WriteProtect(false);
-	if(installUnlaunch(info, disableAllPatches,
-						enableSoundAndSplash ? splashSoundBinaryPatchPath : NULL,
-						customBgSpan))
+	if(installUnlaunch(info, installOptions))
 	{
 		messageBox("Install successful!\n");
 		info.tmdGood = false;
@@ -660,12 +673,12 @@ void customBg() {
 		return;
 	}
 	if(auto newBg = backgroundMenu(); newBg.has_value())
-		customBgSpan = *newBg;
+		installOptions.customBackground = *newBg;
 }
 
 void doMainMenu(consoleInfo& info) {
 	int cursor = 0;
-	customBgSpan = {};
+	installOptions.customBackground = {};
 	while(!programEnd)
 	{
 		cursor = mainMenu(info, cursor);
@@ -692,31 +705,35 @@ void doMainMenu(consoleInfo& info) {
 			{
 				break;
 			}
-			if(enableSoundAndSplash)
-			{
-				break;
-			}
 			if(!isLauncherVersionSupported || foundUnlaunchInstallerVersion != v2_0)
 			{
 				break;
 			}
-			disableAllPatches = !disableAllPatches;
+			installOptions.noLauncherPatches = !installOptions.noLauncherPatches;
 			break;
 
-		case MAIN_MENU_SOUND_SPLASH_PATCHES:
+		case MAIN_MENU_SOUND_PATCHES:
 			if(!isLauncherVersionSupported || foundUnlaunchInstallerVersion != v2_0)
 			{
 				break;
 			}
-			if(disableAllPatches)
+			if(installOptions.noLauncherPatches)
 			{
 				break;
 			}
-			if(splashSoundBinaryPatchPath == nullptr)
+			installOptions.disableSound = !installOptions.disableSound;
+			break;
+
+		case MAIN_MENU_SPLASH_PATCHES:
+			if(!isLauncherVersionSupported || foundUnlaunchInstallerVersion != v2_0)
 			{
 				break;
 			}
-			enableSoundAndSplash = !enableSoundAndSplash;
+			if(installOptions.noLauncherPatches)
+			{
+				break;
+			}
+			installOptions.disableHealthAndSafety = !installOptions.disableHealthAndSafety;
 			break;
 
 		case MAIN_MENU_SAFE_UNLAUNCH_INSTALL:

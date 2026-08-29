@@ -11,12 +11,19 @@ typedef enum UNLAUNCH_VERSION {
 	INVALID,
 } UNLAUNCH_VERSION;
 
+struct unlaunchInstallOptions {
+	bool noLauncherPatches;
+	bool disableSound;
+	bool disableHealthAndSafety;
+	std::span<uint8_t> customBackground;
+};
+
 static constexpr auto MAX_GIF_SIZE = 0x3C70;
 
 const char* getUnlaunchVersionString(UNLAUNCH_VERSION);
 
 bool uninstallUnlaunch(const consoleInfo& info, bool removeHNAABackup);
-bool installUnlaunch(const consoleInfo& info, bool disableAllPatches, const char* splashSoundBinaryPatchPath, std::span<uint8_t> customBackground);
+bool installUnlaunch(const consoleInfo& info, const unlaunchInstallOptions& options);
 
 UNLAUNCH_VERSION loadUnlaunchInstaller(std::string_view path);
 UNLAUNCH_VERSION loadUnlaunchLikeHomebrew(std::string_view path);
