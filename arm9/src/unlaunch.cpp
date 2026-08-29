@@ -497,9 +497,9 @@ static bool patchUnlaunchInstaller(bool disableAllPatches, const char* splashSou
 			return false;
 		}
 	} else {
-		const char* patchFile = "nitro:/fix-devicelist-patch.bin";
+		const char* patchFile = "nitro:/patches/fix-devicelist.bin";
 		if(disableAllPatches) {
-			patchFile = "nitro:/fix-devicelist-patch-no-launcher-patches.bin";
+			patchFile = "nitro:/patches/no-launcher-patches.bin";
 		}
 		printf("Applying Device list patch\n");
 		if(!applyBinaryPatch(patchFile))

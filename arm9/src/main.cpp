@@ -390,13 +390,11 @@ void loadUnlaunchInstaller() {
 }
 
 void loadUnlaunchInstallerPatch() {
-	if (fileExists("sd:/sound-and-splash-patch.bin")) {
-		splashSoundBinaryPatchPath = "sd:/sound-and-splash-patch.bin";
-	} else if(fileExists("nitro:/sound-and-splash-patch.bin")) {
-		splashSoundBinaryPatchPath = "nitro:/sound-and-splash-patch.bin";
+	if(fileExists("nitro:/patches/enable-sound-and-splash.bin")) {
+		splashSoundBinaryPatchPath = "nitro:/patches/enable-sound-and-splash.bin";
 	}
-	if(!fileExists("nitro:/fix-devicelist-patch.bin")) {
-		throw std::runtime_error(std::format("Failed to find device list patch ({})", "nitro:/fix-devicelist-patch.bin"));
+	if(!fileExists("nitro:/patches/fix-devicelist.bin")) {
+		throw std::runtime_error(std::format("Failed to find device list patch ({})", "nitro:/patches/fix-devicelist.bin"));
 	}
 }
 
