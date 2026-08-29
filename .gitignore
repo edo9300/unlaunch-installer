@@ -10,4 +10,11 @@
 *._*
 !nitrofiles/*
 .qtc_clangd/*
+.qtcreator/*
 *.TMP
+*.cflags
+*.files
+*.config
+*.creator*
+*.cxxflags
+*.includes
