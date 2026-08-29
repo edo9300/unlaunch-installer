@@ -116,7 +116,7 @@ static int mainMenu(const consoleInfo& info, int cursor)
 			"\nlow, of \x1B[41mbricking\x1B[47m your system"
 			"\nand should be done with caution!\n");
 	printf("\n\t  \x1B[46mhttps://dsi.cfw.guide\x1B[47m\n");
-	printf("\x1b[23;0Hedo9300 - 2025");
+	printf("\x1b[23;0Hedo9300 - 2025-2026");
 
 	//menu
 	Menu* m = newMenu();
