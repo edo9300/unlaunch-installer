@@ -57,11 +57,10 @@ The installer ships with 6 binary patches:
  - Enable the dsi menu sound **only**. This works by modifying
  the patches to apply to the launcher's arm7i binary by only making unlaunch patch the code
  disabling the display of the H&S screen.
- - ~~A mandatory one, required to make unlaunch properly use the tmd that
- was installed in the HNAA folder, otherwise it would attempt to save its settings
- to random fat blocks, since it assumes that unlaunch is installed in the blocks right
- after the title.tmd associated with the launcher read from HWINFO_S.~~
- Not used as it causes side effects.
+ - A mandatory one, required to make unlaunch properly use the tmd that
+ was installed in the HNAA folder, rather than deducing it from parsing HWINFO_S.
+This makes so that unlaunch writes the options to the actual tmd rather than to the extra
+clusters in the main launcher's tmd, it also allows again wifiboot to be launched.
  - Fix the a wrong behaviour regarding homebrew booting and passing to them the directory they were in.
 The patch replaces a beq at file offset `0x2cf0` (0x06026980 when executed) with a nop.
 The replaced check is for the rom's tid to be of "dsiware" (which almost no homebrew is)
@@ -95,92 +94,45 @@ If a short to match is `0xAAAA`, that has to be interpreted as wildcard matching
 In its patching code, unlaunch checks if bit `15` of `dataToMatchLength` is set, in which case it will skip
 that patch block unless a global variable at address `0x2FFFDF4` has the 2 lower bits clear (`*(u32)0x2FFFDF4 & 3 == 0`).
 
-## This patch is currently not used because it breaks system titles launching
-The other patch, modifies the code responsible for reading the launcher title id from HWINFO.
-The original code is as follow
+## Tmd path retrieval patch
+This patch makes so that unlaunch reads the path to the launcher tmd from the leftover data left
+in DTCM (at address `0x30034C4`, a string containing `title/00030017/484e41XX/content/title.tmd`).
+
+2 pieces of the binary are patched:
+ - The first replaces a random instruction in the early arm9 bootstrap to a jump to our custom payload.
+ The function in question is the one at ram address `0x602c454` (payload offset `0x8838`), we replace the return statement
+ `ldmia      sp!,{r4,r5,r6,r7,r8,r9,r10,r11,r12,pc}` with a `b 0x0602acd0` (the target of our payload)
+
+ - The second patches the function that unlaunch uses to open a file handle to the tmd to read/write to.
+ The function in question is at ram address `0x602acc8` (payload offset `0x7038`).
+ Basically the function is rewritten, the existing function reads the launcher TID parsed from HWINFO_S
+ and formats a string then passed to `fopen`.
 ```
-@ this loads in r0 the buffer containing the contents read
-@ from HWINFO_S, offsetted at the position of the title id
-FC 05 9F E5    ldr   r0, [pc, #0x5fc]
-FC 15 9F E5    ldr   r1, [pc, #0x5fc]
-@ This reads the title id and then stores it to the address
-@ pointed by r1, which is then used across the whole program
-00 00 90 E5    ldr   r0, [r0]
-00 00 81 E5    str   r0, [r1]
-F4 05 9F E5    ldr   r0, [pc, #0x5f4]
-9d 01 00 EB    bl    #0x602a3c4
-C5 FD FF EB    bl    #0x602946c
-EC 05 9F E5    ldr   r0, [pc, #0x5ec]
-00 00 90 E5    ldr   r0, [r0]
-E8 15 9F E5    ldr   r1, [pc, #0x5e8]
-66 00 00 EB    bl    #0x6029f00
-E4 05 9F E5    ldr   r0, [pc, #0x5e4]
-E4 15 9F E5    ldr   r1, [pc, #0x5e4]
-14 20 A0 E3    mov   r2, #0x14
-0C 09 00 EB    bl    #0x602c1a8
-DC 05 9F E5    ldr   r0, [pc, #0x5dc]
-91 01 00 EB    bl    #0x602a3c4
-BA FD FF EB    bl    #0x602946c
-D4 05 9F E5    ldr   r0, [pc, #0x5d4]
-00 00 90 E5    ldr   r0, [r0]
-D0 15 9F E5    ldr   r1, [pc, #0x5d0]
-02 2C A0 E3    mov   r2, #0x200
-5B 00 00 EB    bl    #0x6029f04
-C8 15 9F E5    ldr   r1, [pc, #0x5c8]
-E4 01 91 E5    ldr   r0, [r1, #0x1e4]
-72 08 00 EB    bl    #0x602bf6c
-C0 15 9F E5    ldr   r1, [pc, #0x5c0]
-19 00 00 EB    bl    #0x6029e10
-00 00 A0 E3    mov   r0, #0
-01 00 C1 E4    strb  r0, [r1], #1
-B4 05 9F E5    ldr   r0, [pc, #0x5b4]
-93 01 D0 E5    ldrb  r0, [r0, #0x193]
-01 00 C1 E4    strb  r0, [r1], #1
-FF 9F BD E8    pop   {r0, r1, r2, r3, r4, r5, r6, r7, r8, sb, sl, fp, ip, pc}
+F0 5F 2D E9     stmdb      sp!,{r4,r5,r6,r7,r8,r9,r10,r11,r12,lr}
+
+70 01 9F E5     ldr        r0,[0x602ae44]
+00 00 90 E5     ldr        r0,[r0,#0x0]		@ gets the TID parsed from HWINFO_S
+6c 11 9f E5     ldr        r1,[0x602ae48]   @"484E41xx\CONTENT\TITLE.TMD" (note, this is a substring of the string below)
+4C FC FF EB     bl         0x06029e10       @function formatting an int to string
+
+68 01 9F E5     ldr        r0,[0x602ae4c]   @"nand:\TITLE\00030017\484E41xx\CONTENT\TITLE.TMD" (note, the string is now formatted)
+B7 FD FF EB     bl         0x0602a3c4       @fopen
+F0 9F BD E8     ldmia      sp!,{r4,r5,r6,r7,r8,r9,r10,r11,r12,pc}
 ```
-The patched code is
+
+The new payload is 
 ```
-@ Instead of reading the title id from the HWINFO_S buffer,
-@ read the hardcoded value placed at the bottom.
-@ all the relative addresses have been incremented by 4 to account
-@ for the shift of the instructions (same for the relative bl instructions)
-7C 00 9F E5    ldr     r0, [pc, #0x7c]
-FC 15 9F E5    ldr     r1, [pc, #0x5fc]
-00 00 81 E5    str     r0, [r1]
-F8 05 9F E5    ldr     r0, [pc, #0x5f8]
-9D 01 00 EB    bl      #0x602a3c4
-C6 FD FF EB    bl      #0x602946c
-F0 05 9F E5    ldr     r0, [pc, #0x5f0]
-00 00 90 E5    ldr     r0, [r0]
-EC 15 9F E5    ldr     r1, [pc, #0x5ec]
-67 00 00 EB    bl      #0x6029f00
-E8 05 9F E5    ldr     r0, [pc, #0x5e8]
-E8 15 9F E5    ldr     r1, [pc, #0x5e8]
-14 20 A0 E3    mov     r2, #0x14
-0D 09 00 EB    bl      #0x602c1a8
-E0 05 9F E5    ldr     r0, [pc, #0x5e0]
-92 01 00 EB    bl      #0x602a3c4
-BB FD FF EB    bl      #0x602946c
-D8 05 9F E5    ldr     r0, [pc, #0x5d8]
-00 00 90 E5    ldr     r0, [r0]
-D4 15 9F E5    ldr     r1, [pc, #0x5d4]
-02 2C A0 E3    mov     r2, #0x200
-5C 00 00 EB    bl      #0x6029f04
-CC 15 9F E5    ldr     r1, [pc, #0x5cc]
-E8 01 91 E5    ldr     r0, [r1, #0x1e8]
-73 08 00 EB    bl      #0x602bf6c
-C4 15 9F E5    ldr     r1, [pc, #0x5c4]
-1A 00 00 EB    bl      #0x6029e10
-00 00 A0 E3    mov     r0, #0
-01 00 C1 E4    strb    r0, [r1], #1
-B8 05 9F E5    ldr     r0, [pc, #0x5b8]
-97 01 D0 E5    ldrb    r0, [r0, #0x197]
-01 00 C1 E4    strb    r0, [r1], #1
-FF 9F BD E8    pop     {r0, r1, r2, r3, r4, r5, r6, r7, r8, sb, sl, fp, ip, pc}
-41 41 4E 48    .word 0x484e4141
+7C 01 9F E5     ldr        r0,[0x602ae4c]   @"nand:\TITLE\00030017\484E41xx\CONTENT\TITLE.TMD" (note, the string is preformatted by the below payload)
+BC FD FF EA     b          0x0602a3c4		@fopen
+
+03 20 A0 E3     mov        r2,#0x3          @copy 3 bytes (corresponding to 1XX in the format string), rather than 2 so that the address is aligned
+08 10 9F E5     ldr        r1,dst
+15 0C 8D E2     add        r0,sp,#0x1500    @when called, sp is 0x3001FD8, by adding 0x1500 we get 0x30034D8, which corresponds to the substring "1XX/content/title.tmd"
+31 05 00 EB     bl         0x0602c1a8		@memcpy
+F0 9F BD E8     ldmia      sp!,{r4,r5,r6,r7,r8,r9,r10,r11,r12,pc}
+dst:
+9a 86 02 06     .word      0x0602869a       @"1xx\CONTENT\TITLE.TMD" (note, this is a substring of the string above)
 ```
-The patched code is found at address `0x60a7` in the decompressed binary, and is loaded into
-ram at address `0x6029d38`.
 
 The lzss compressed arm7 payload is found at offset `0x8580` for unlaunch 2.0 with a length of `0x67FD`.
 
