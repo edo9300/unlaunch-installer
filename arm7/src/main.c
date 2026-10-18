@@ -28,9 +28,11 @@ int main()
 	initClockIRQTimer(3);
 
 	struct {
+		u8 isNonRetail;
 		u64 consoleId;
 		u32 cid[4];
 	} consoleIdAndCid;
+	consoleIdAndCid.isNonRetail = REG_SCFG_OP != 0;
 	consoleIdAndCid.consoleId = getConsoleID();
 
 	SDMMC_init(SDMMC_DEV_eMMC);

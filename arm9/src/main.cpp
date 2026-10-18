@@ -42,6 +42,7 @@ int bgGifTop;
 int bgGifBottom;
 
 static struct {
+	uint8_t isNonRetail;
 	uint64_t consoleId;
 	uint32_t cid[4];
 } consoleIdAndCid;
@@ -571,7 +572,7 @@ void retrieveInstalledLauncherInfo(consoleInfo& info) {
 
 	// I own and know of many people with retail and dev prototypes
 	// These can normally be identified by having the region set to ALL (0x41)
-	info.isRetail = (region != 0x41 && region != 0xFF);
+	info.isRetail = (region != 0x41 && region != 0xFF) && !consoleIdAndCid.isNonRetail;
 
 	//check for unlaunch and region
 	if (info.isRetail && launcher_tid_str.size() != 0) {
