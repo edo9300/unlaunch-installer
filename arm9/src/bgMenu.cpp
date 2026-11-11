@@ -63,7 +63,7 @@ std::optional<std::span<uint8_t>> backgroundMenu()
 		addMenuItem(m, bgName.data(), nullptr, true, false);
 	}
 	addMenuItem(m, "Default", nullptr, true, false);
-	// addMenuItem(m, "Cancel", nullptr, true, false);
+	addMenuItem(m, "Cancel", nullptr, true, false);
 
 	m->cursor = 0;
 
@@ -83,7 +83,7 @@ std::optional<std::span<uint8_t>> backgroundMenu()
 				break;
 			else if(keys & KEY_B)
 			{
-				return {};
+				return std::span<uint8_t>{};
 			}
 		}
 
@@ -93,7 +93,7 @@ std::optional<std::span<uint8_t>> backgroundMenu()
 		auto selection = static_cast<size_t>(m->cursor);
 
 		if(selection == bgs.size())
-			return {};
+			return std::span<uint8_t>{};
 		else if (selection > bgs.size())
 		{
 			return std::nullopt;
@@ -117,5 +117,5 @@ std::optional<std::span<uint8_t>> backgroundMenu()
 		printMenu(m);
 	}
 
-	return {};
+	return std::span<uint8_t>{};
 }
